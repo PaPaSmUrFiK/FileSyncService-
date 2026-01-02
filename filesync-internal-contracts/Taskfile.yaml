@@ -1,0 +1,34 @@
+# See: https://taskfile.dev/api/
+
+version: "3"
+
+tasks:
+  generate-storage:
+    desc: "Generate Go gRPC code for Storage service"
+    cmds:
+      - >
+        protoc -I proto
+        proto/filesync/storage/v1/storage.proto
+        --go_out=./gen/go
+        --go_opt=paths=source_relative
+        --go-grpc_out=./gen/go
+        --go-grpc_opt=paths=source_relative
+
+  generate-sync:
+    desc: "Generate Go gRPC code for Sync service"
+    cmds:
+      - >
+        protoc -I proto
+        proto/filesync/sync/v1/sync.proto
+        --go_out=./gen/go
+        --go_opt=paths=source_relative
+        --go-grpc_out=./gen/go
+        --go-grpc_opt=paths=source_relative
+
+  generate:
+    aliases:
+      - gen
+    desc: "Generate Go gRPC code for all services"
+    deps:
+      - generate-storage
+      - generate-sync
