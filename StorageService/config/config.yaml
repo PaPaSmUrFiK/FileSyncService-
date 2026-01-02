@@ -1,0 +1,14 @@
+env: "local"
+grpc:
+  port: 9094
+postgres:
+  url: "postgres://filesync:secret@localhost:5433/postgres?sslmode=disable"
+minio:
+  endpoint: "localhost:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  bucket: "file-sync-storage"
+  use_ssl: false
+kafka:
+  brokers: ["localhost:9092"]
+  topic: "storage.events"
