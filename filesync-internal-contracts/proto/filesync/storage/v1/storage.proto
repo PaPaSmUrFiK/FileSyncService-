@@ -1,0 +1,69 @@
+syntax = "proto3"; // Protobuf v3
+
+package filesync.storage.v1; // Versioned package
+
+option go_package = "github.com/PaPaSmUrFiK/FileSyncService-/filesync-internal-contracts/gen/go/filesync/storage/v1;storagev1";
+
+// StorageService отвечает ТОЛЬКО за физическое хранение файлов
+// и работу с объектным хранилищем (S3 / MinIO).
+service StorageService {
+
+  // Генерация presigned URL для загрузки файла
+  rpc GetUploadUrl (UploadUrlRequest) returns (UrlResponse);
+
+  // Генерация presigned URL для скачивания файла
+  rpc GetDownloadUrl (DownloadUrlRequest) returns (UrlResponse);
+
+  // Удаление файла или конкретной версии
+  rpc DeleteFile (DeleteFileRequest) returns (EmptyResponse);
+
+  // Копирование файла (используется при восстановлении версии или шаринге)
+  rpc CopyFile (CopyFileRequest) returns (EmptyResponse);
+
+  // Подтверждение успешной загрузки файла
+  rpc ConfirmUpload (ConfirmUploadRequest) returns (EmptyResponse);
+}
+
+// ===== Requests =====
+
+message UploadUrlRequest {
+  string file_id = 1;      // ID файла (UUID)
+  string file_name = 2;    // Имя файла
+  int64 file_size = 3;     // Размер файла в байтах
+  string mime_type = 4;    // MIME-тип
+  int32 version = 5;       // Версия файла
+}
+
+message DownloadUrlRequest {
+  string file_id = 1;          // ID файла
+  optional int32 version = 2;  // Конкретная версия (если не указана — последняя)
+}
+
+message DeleteFileRequest {
+  string file_id = 1;          // ID файла
+  optional int32 version = 2;  // Версия для удаления (если не указана — все)
+}
+
+message CopyFileRequest {
+  string source_file_id = 1;       // Исходный файл
+  string destination_file_id = 2;  // Целевой файл
+}
+
+message ConfirmUploadRequest {
+  string file_id = 1;  // ID файла
+  int32 version = 2;   // Версия
+  string hash = 3;     // Контрольная сумма (SHA-256)
+}
+
+// ===== Responses =====
+
+message UrlResponse {
+  string url = 1;                     // Presigned URL
+  string method = 2;                  // HTTP метод (PUT / GET)
+  int64 expires_in = 3;               // Время жизни URL (сек)
+  map<string, string> headers = 4;    // Дополнительные заголовки
+}
+
+message EmptyResponse {}
+
+//protoc -I proto proto/filesync/storage/v1/storage.proto --go_out=./gen/go --go_opt=paths=source_relative --go-grpc_out=./gen/go/ --go-grpc_opt=paths=source_relative
