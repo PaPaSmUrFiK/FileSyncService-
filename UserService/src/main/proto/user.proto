@@ -1,0 +1,291 @@
+syntax = "proto3";
+
+package user;
+
+option java_package = "com.filesync.user.grpc";
+option java_multiple_files = true;
+
+service UserService {
+  // Пользовательские функции
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (EmptyResponse);
+  rpc GetUserSettings(GetUserSettingsRequest) returns (SettingsResponse);
+  rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (SettingsResponse);
+  rpc CheckQuota(CheckQuotaRequest) returns (QuotaResponse);
+  rpc UpdateStorageUsed(UpdateStorageUsedRequest) returns (EmptyResponse);
+  
+  // Административные функции - управление пользователями
+  rpc ListUsers(ListUsersRequest) returns (UserListResponse);
+  rpc GetUserDetails(GetUserDetailsRequest) returns (UserDetailsResponse);
+  rpc UpdateUserQuota(UpdateUserQuotaRequest) returns (EmptyResponse);
+  rpc ChangeUserPlan(ChangeUserPlanRequest) returns (EmptyResponse);
+  
+  // Административные функции - статистика (динамические запросы)
+  rpc GetSystemStatistics(GetSystemStatisticsRequest) returns (SystemStatsResponse);
+  rpc GetStorageStatistics(GetStorageStatisticsRequest) returns (StorageStatsResponse);
+  rpc GetUserStatistics(GetUserStatisticsRequest) returns (UserStatsResponse);
+  rpc GetActiveUsers(GetActiveUsersRequest) returns (ActiveUsersResponse);
+  
+  // Административные функции - роли (делегирует в AuthService)
+  rpc AssignUserRole(AssignUserRoleRequest) returns (EmptyResponse);
+  rpc RevokeUserRole(RevokeUserRoleRequest) returns (EmptyResponse);
+  rpc GetUserRoles(GetUserRolesRequest) returns (UserRolesResponse);
+  
+  // Административные функции - блокировка (делегирует в AuthService)
+  rpc BlockUser(BlockUserRequest) returns (EmptyResponse);
+  rpc UnblockUser(UnblockUserRequest) returns (EmptyResponse);
+}
+
+// Базовые запросы
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  optional string name = 2;
+  optional string avatar_url = 3;
+}
+
+message DeleteUserRequest {
+  string user_id = 1;
+}
+
+message UserResponse {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string avatar_url = 4;
+  repeated string roles = 5;
+  int64 storage_used = 6;
+  int64 storage_quota = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// Настройки
+message GetUserSettingsRequest {
+  string user_id = 1;
+}
+
+message UpdateUserSettingsRequest {
+  string user_id = 1;
+  optional string theme = 2;
+  optional string language = 3;
+  optional bool notifications_enabled = 4;
+  optional bool email_notifications = 5;
+  optional bool auto_sync = 6;
+  optional bool sync_on_mobile_data = 7;
+}
+
+message SettingsResponse {
+  string user_id = 1;
+  string theme = 2;
+  string language = 3;
+  bool notifications_enabled = 4;
+  bool email_notifications = 5;
+  bool auto_sync = 6;
+  bool sync_on_mobile_data = 7;
+}
+
+// Квоты
+message CheckQuotaRequest {
+  string user_id = 1;
+  int64 file_size = 2;
+}
+
+message QuotaResponse {
+  bool has_space = 1;
+  int64 available_space = 2;
+  int64 storage_used = 3;
+  int64 storage_quota = 4;
+}
+
+message UpdateStorageUsedRequest {
+  string user_id = 1;
+  int64 size_delta = 2;
+}
+
+// Административные запросы
+message ListUsersRequest {
+  string admin_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  optional string search = 4;
+  optional string plan = 5;
+  string sort_by = 6; // created_at, storage_used, email
+  string sort_order = 7; // asc, desc
+}
+
+message UserListResponse {
+  repeated UserInfo users = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message UserInfo {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  repeated string roles = 4;
+  string plan = 5;
+  int64 storage_used = 6;
+  int64 storage_quota = 7;
+  bool is_blocked = 8;
+  string created_at = 9;
+  string last_login_at = 10;
+}
+
+message GetUserDetailsRequest {
+  string admin_id = 1;
+  string user_id = 2;
+}
+
+message UserDetailsResponse {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string avatar_url = 4;
+  repeated string roles = 5;
+  string plan = 6;
+  int64 storage_used = 7;
+  int64 storage_quota = 8;
+  int32 max_devices = 9;
+  int32 max_shares = 10;
+  int64 max_file_size = 11;
+  bool is_blocked = 12;
+  optional string blocked_reason = 13;
+  optional string blocked_at = 14;
+  string created_at = 15;
+  string updated_at = 16;
+  string last_login_at = 17;
+}
+
+message UpdateUserQuotaRequest {
+  string admin_id = 1;
+  string user_id = 2;
+  int64 new_quota = 3;
+}
+
+message ChangeUserPlanRequest {
+  string admin_id = 1;
+  string user_id = 2;
+  string new_plan = 3; // free, premium, business, enterprise
+}
+
+// Блокировка (делегирует в AuthService)
+message BlockUserRequest {
+  string admin_id = 1;
+  string user_id = 2;
+  string reason = 3;
+}
+
+message UnblockUserRequest {
+  string admin_id = 1;
+  string user_id = 2;
+}
+
+// Статистика (динамические запросы)
+message GetSystemStatisticsRequest {
+  string admin_id = 1;
+  optional int64 from_timestamp = 2;
+  optional int64 to_timestamp = 3;
+}
+
+message SystemStatsResponse {
+  int32 total_users = 1;
+  int32 active_users_today = 2;
+  int32 active_users_week = 3;
+  int32 active_users_month = 4;
+  int32 new_users_today = 5;
+  int32 new_users_week = 6;
+  int32 new_users_month = 7;
+  int64 total_storage_used = 8;
+  int64 total_storage_allocated = 9;
+  double storage_usage_percentage = 10;
+}
+
+message GetStorageStatisticsRequest {
+  string admin_id = 1;
+}
+
+message StorageStatsResponse {
+  int64 total_storage_used = 1;
+  int64 total_storage_allocated = 2;
+  repeated StorageByPlan storage_by_plan = 3;
+  repeated TopStorageUser top_users = 4;
+}
+
+message StorageByPlan {
+  string plan = 1;
+  int32 users_count = 2;
+  int64 storage_used = 3;
+  int64 storage_allocated = 4;
+}
+
+message TopStorageUser {
+  string user_id = 1;
+  string email = 2;
+  string name = 3;
+  int64 storage_used = 4;
+}
+
+message GetUserStatisticsRequest {
+  string admin_id = 1;
+}
+
+message UserStatsResponse {
+  int32 total_users = 1;
+  int32 free_users = 2;
+  int32 premium_users = 3;
+  int32 business_users = 4;
+  int32 enterprise_users = 5;
+  repeated UsersByDate users_by_date = 6;
+}
+
+message UsersByDate {
+  string date = 1;
+  int32 count = 2;
+}
+
+message GetActiveUsersRequest {
+  string admin_id = 1;
+  int32 minutes = 2;
+}
+
+message ActiveUsersResponse {
+  int32 count = 1;
+  repeated ActiveUserInfo users = 2;
+}
+
+message ActiveUserInfo {
+  string user_id = 1;
+  string email = 2;
+  string name = 3;
+  string last_active = 4;
+}
+
+// Управление ролями (делегирует в AuthService)
+message AssignUserRoleRequest {
+  string admin_id = 1;
+  string user_id = 2;
+  string role_name = 3;
+}
+
+message RevokeUserRoleRequest {
+  string admin_id = 1;
+  string user_id = 2;
+  string role_name = 3;
+}
+
+message GetUserRolesRequest {
+  string user_id = 1;
+}
+
+message UserRolesResponse {
+  repeated string roles = 1;
+}
+
+message EmptyResponse {}

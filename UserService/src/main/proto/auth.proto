@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package auth;
+
+option java_package = "com.authservice.grpc";
+option java_multiple_files = true;
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (TokenResponse);
+  rpc Login(LoginRequest) returns (TokenResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidationResponse);
+  rpc Logout(LogoutRequest) returns (EmptyResponse);
+  rpc LogoutAll(LogoutAllRequest) returns (EmptyResponse);
+
+  rpc AssignRole(AssignRoleRequest) returns (EmptyResponse);
+  rpc RevokeRole(RevokeRoleRequest) returns (EmptyResponse);
+  rpc GetUserRoles(GetUserRolesRequest) returns (UserRolesResponse);
+  
+  // New methods required by UserService
+  rpc GetActiveUsersCount(TimeRangeRequest) returns (CountResponse);
+  rpc GetUsersActiveInLastMinutes(TimeWindowRequest) returns (UserIdsResponse);
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+  optional string device_info = 3;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+message LogoutAllRequest {}
+
+message AssignRoleRequest {
+  string user_id = 1;
+  string role_name = 2;
+}
+
+message RevokeRoleRequest {
+  string user_id = 1;
+  string role_name = 2;
+}
+
+message GetUserRolesRequest {
+  string user_id = 1;
+}
+
+message TokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  int64 expires_in = 4;
+  string user_id = 5;
+  string email = 6;
+  string name = 7;
+  repeated string roles = 8;
+}
+
+message ValidationResponse {
+  bool is_valid = 1;
+  string user_id = 2;
+  string email = 3;
+  repeated string roles = 4;
+  string error_message = 5;
+}
+
+message UserRolesResponse {
+  repeated string roles = 1;
+}
+
+message EmptyResponse {}
+
+// New messages
+message TimeRangeRequest {
+  int64 from_timestamp = 1;
+  int64 to_timestamp = 2;
+}
+
+message CountResponse {
+  int32 count = 1;
+}
+
+message TimeWindowRequest {
+  int32 minutes = 1;
+}
+
+message UserIdsResponse {
+  repeated string user_ids = 1;
+}

@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: user-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5433/user_db
+    username: filesync
+    password: secret
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+    
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: user-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8082
+
+grpc:
+  server:
+    port: 9090
+  client:
+    auth-service:
+      address: static://localhost:9091
+      negotiation-type: plaintext
+
+logging:
+  level:
+    root: INFO
+    com.filesync.userservice: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/user_db
+    username: filesync
+    password: secret
+
+  kafka:
+    bootstrap-servers: kafka:29092
+
+grpc:
+  client:
+    auth-service:
+      address: static://auth-service:9091
