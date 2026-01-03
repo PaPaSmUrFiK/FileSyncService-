@@ -1,0 +1,201 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: file-service
+
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:file_db}
+    username: ${DB_USER:filesync}
+    password: ${DB_PASSWORD:secret}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: FileServiceHikariPool
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    show-sql: false
+    open-in-view: false
+
+  # Flyway Configuration
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    validate-on-migrate: false
+    clean-disabled: true
+
+  # Redis Configuration
+  data:
+    redis:
+      repositories:
+        enabled: false
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 minutes
+      cache-null-values: false
+      key-prefix: "file-service:"
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: file-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "*"
+    listener:
+      ack-mode: manual
+
+# gRPC Configuration
+grpc:
+  server:
+    port: 9093
+  client:
+    # Storage Service
+    storage-service:
+      address: static://${STORAGE_SERVICE_HOST:localhost}:${STORAGE_SERVICE_PORT:9094}
+      negotiationType: PLAINTEXT
+    # User Service
+    user-service:
+      address: static://${USER_SERVICE_HOST:localhost}:${USER_SERVICE_PORT:9090}
+      negotiationType: PLAINTEXT
+    # Auth Service
+    auth-service:
+      address: static://${AUTH_SERVICE_HOST:localhost}:${AUTH_SERVICE_PORT:9091}
+      negotiationType: PLAINTEXT
+
+# Kafka Topics
+kafka:
+  topics:
+    file-events: file.events
+
+# File Service Configuration
+file-service:
+  quota:
+    default-user-quota: 5368709120 # 5GB
+    max-file-size: 104857600 # 100MB
+  versioning:
+    enabled: true
+    max-versions-per-file: 10
+    retention-days: 30
+  upload:
+    session-expiry-minutes: 15
+    chunk-size: 5242880 # 5MB
+    max-concurrent-uploads: 5
+  share:
+    default-expiry-days: 30
+    max-shares-per-file: 50
+  cleanup:
+    deleted-files-retention-days: 30
+    enabled: true
+    schedule: "0 0 2 * * ?"
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.fileservice: DEBUG
+    org.springframework.web: INFO
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: DEBUG
+    org.flywaydb: DEBUG
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+---
+# Docker Profile
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://postgres:5432/file_db
+    username: filesync
+    password: secret
+  flyway:
+    url: jdbc:postgresql://postgres:5432/file_db
+    user: filesync
+    password: secret
+  data:
+    redis:
+      host: redis
+      port: 6379
+  kafka:
+    bootstrap-servers: kafka:29092
+
+grpc:
+  client:
+    storage-service:
+      address: static://storage-service:9094
+    user-service:
+      address: static://user-service:9090
+    auth-service:
+      address: static://auth-service:9091

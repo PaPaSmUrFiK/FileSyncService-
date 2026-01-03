@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package storage;
+
+option java_multiple_files = true;
+option java_package = "com.storageservice.grpc";
+
+service StorageService {
+  rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse);
+  rpc CopyFile(CopyFileRequest) returns (CopyFileResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+  rpc GetUploadUrl(GetUploadUrlRequest) returns (GetUploadUrlResponse);
+  rpc GetDownloadUrl(GetDownloadUrlRequest) returns (GetDownloadUrlResponse);
+}
+
+message GetUploadUrlRequest {
+  string file_id = 1;
+}
+
+message GetUploadUrlResponse {
+  string upload_url = 1;
+}
+
+message GetDownloadUrlRequest {
+  string file_id = 1;
+}
+
+message GetDownloadUrlResponse {
+  string download_url = 1;
+}
+
+
+message ConfirmUploadRequest {
+  string file_id = 1;
+  bool success = 2;
+  string storage_path = 3;
+}
+
+message ConfirmUploadResponse {
+  bool acknowledged = 1;
+}
+
+message CopyFileRequest {
+  string source_path = 1;
+  string destination_path = 2;
+}
+
+message CopyFileResponse {
+  bool success = 1;
+  string new_storage_path = 2;
+}
+
+message DeleteFileRequest {
+  string storage_path = 1;
+}
+
+message DeleteFileResponse {
+  bool success = 1;
+}
