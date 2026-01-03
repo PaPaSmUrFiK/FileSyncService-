@@ -1,0 +1,19 @@
+env: "local"
+
+grpc:
+  port: 9095
+
+http:
+  port: 8084
+
+postgres:
+  url: "postgres://postgres:secret@localhost:5432/postgres?sslmode=disable"
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  consumer_group: "sync-service"
+  topics:
+    file_events: "file.events"
+    storage_events: "storage.events"
+    sync_events: "sync.events"
