@@ -37,6 +37,7 @@ message UploadUrlRequest {
 message DownloadUrlRequest {
   string file_id = 1;          // ID файла
   optional int32 version = 2;  // Конкретная версия (если не указана — последняя)
+  string file_name = 3;        // Имя файла
 }
 
 message DeleteFileRequest {

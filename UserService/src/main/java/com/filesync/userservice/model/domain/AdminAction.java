@@ -40,7 +40,7 @@ public class AdminAction {
     @JdbcTypeCode(SqlTypes.JSON)
     private String actionDetails;
 
-    @Column(name = "ip_address")
+    @Column(name = "ip_address", columnDefinition = "inet")
     private String ipAddress;
 
     @CreationTimestamp

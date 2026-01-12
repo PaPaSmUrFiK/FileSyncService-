@@ -4,6 +4,25 @@ server:
 spring:
   application:
     name: file-service
+  autoconfigure:
+    exclude:
+      - org.springframework.cloud.consul.discovery.ConsulCatalogWatchAutoConfiguration
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: true
+        service-name: file-service
+        health-check-path: /actuator/health
+        health-check-interval: 60s
+        health-check-timeout: 10s
+        health-check-critical-timeout: 180s
+        instance-id: ${spring.application.name}-${random.value}
+        prefer-ip-address: false
+        fail-fast: false
+        register-health-check: true
+
 
   # Database Configuration
   datasource:
@@ -44,22 +63,10 @@ spring:
     validate-on-migrate: false
     clean-disabled: true
 
-  # Redis Configuration
-  data:
-    redis:
-      repositories:
-        enabled: false
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      timeout: 2000ms
 
   # Cache Configuration
   cache:
-    type: redis
-    redis:
-      time-to-live: 600000 # 10 minutes
-      cache-null-values: false
-      key-prefix: "file-service:"
+    type: none
 
   # Kafka Configuration
   kafka:
@@ -89,15 +96,15 @@ grpc:
   client:
     # Storage Service
     storage-service:
-      address: static://${STORAGE_SERVICE_HOST:localhost}:${STORAGE_SERVICE_PORT:9094}
+      address: static://${STORAGE_SERVICE_HOST:storage-service}:${STORAGE_SERVICE_PORT:9094}
       negotiationType: PLAINTEXT
     # User Service
     user-service:
-      address: static://${USER_SERVICE_HOST:localhost}:${USER_SERVICE_PORT:9090}
+      address: static://${USER_SERVICE_HOST:user-service}:${USER_SERVICE_PORT:9090}
       negotiationType: PLAINTEXT
     # Auth Service
     auth-service:
-      address: static://${AUTH_SERVICE_HOST:localhost}:${AUTH_SERVICE_PORT:9091}
+      address: static://${AUTH_SERVICE_HOST:auth-service}:${AUTH_SERVICE_PORT:9091}
       negotiationType: PLAINTEXT
 
 # Kafka Topics
@@ -184,10 +191,6 @@ spring:
     url: jdbc:postgresql://postgres:5432/file_db
     user: filesync
     password: secret
-  data:
-    redis:
-      host: redis
-      port: 6379
   kafka:
     bootstrap-servers: kafka:29092
 

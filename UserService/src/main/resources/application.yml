@@ -1,6 +1,24 @@
 spring:
   application:
     name: user-service
+  autoconfigure:
+    exclude:
+      - org.springframework.cloud.consul.discovery.ConsulCatalogWatchAutoConfiguration
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: true
+        service-name: user-service
+        health-check-path: /actuator/health
+        health-check-interval: 60s
+        health-check-timeout: 10s
+        health-check-critical-timeout: 180s
+        instance-id: ${spring.application.name}-${random.value}
+        prefer-ip-address: false
+        fail-fast: false
+        register-health-check: true
   
   datasource:
     url: jdbc:postgresql://localhost:5433/user_db
@@ -40,7 +58,7 @@ grpc:
     port: 9090
   client:
     auth-service:
-      address: static://localhost:9091
+      address: static://${AUTH_SERVICE_HOST:auth-service}:${AUTH_SERVICE_PORT:9091}
       negotiation-type: plaintext
 
 logging:
@@ -55,14 +73,21 @@ spring:
       on-profile: docker
 
   datasource:
-    url: jdbc:postgresql://postgres:5432/user_db
+    url: jdbc:postgresql://postgres:5432/user_db?connectTimeout=10&socketTimeout=30
     username: filesync
     password: secret
 
   kafka:
     bootstrap-servers: kafka:29092
 
+
 grpc:
   client:
     auth-service:
       address: static://auth-service:9091
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

@@ -29,7 +29,8 @@ func NewStorageService(repo repository.StorageRepository, storageClient *minio.C
 func (s *StorageService) GetUploadUrl(ctx context.Context, fileID string, version int32, fileName string, size int64) (string, error) {
 	const op = "service.storage.GetUploadUrl"
 
-	objectName := fmt.Sprintf("files/%s/v%d/%s", fileID, version, fileName)
+	// Используем стабильный путь, который можно восстановить в ConfirmUpload
+	objectName := fmt.Sprintf("files/%s/v%d/data", fileID, version)
 	u, err := s.storageClient.GetPresignedUploadURL(ctx, objectName, 1*time.Hour)
 	if err != nil {
 		return "", fmt.Errorf("%s: не удалось получить URL для загрузки: %w", op, err)
@@ -37,7 +38,7 @@ func (s *StorageService) GetUploadUrl(ctx context.Context, fileID string, versio
 	return u.String(), nil
 }
 
-func (s *StorageService) GetDownloadUrl(ctx context.Context, fileID string, version *int32) (string, error) {
+func (s *StorageService) GetDownloadUrl(ctx context.Context, fileID string, version *int32, fileName string) (string, error) {
 	const op = "service.storage.GetDownloadUrl"
 
 	uid, err := uuid.Parse(fileID)
@@ -66,7 +67,7 @@ func (s *StorageService) GetDownloadUrl(ctx context.Context, fileID string, vers
 		storagePath = mapping.StoragePath
 	}
 
-	u, err := s.storageClient.GetPresignedDownloadURL(ctx, storagePath, 1*time.Hour)
+	u, err := s.storageClient.GetPresignedDownloadURL(ctx, storagePath, fileName, 1*time.Hour)
 	if err != nil {
 		return "", fmt.Errorf("%s: не удалось получить URL для скачивания: %w", op, err)
 	}

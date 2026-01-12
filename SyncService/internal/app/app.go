@@ -12,6 +12,7 @@ import (
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/config"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/grpc"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/kafka"
+	kafkalib "github.com/segmentio/kafka-go"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/lib/logger/handlers/slogpretty"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/repository/postgres"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/service"
@@ -54,6 +55,13 @@ func (a *App) Run() error {
 	producer := kafka.NewProducer(a.cfg.Kafka.Brokers, a.cfg.Kafka.Topics.SyncEvents)
 	defer producer.Close()
 
+	// 3.1. Kafka Consumers
+	fileEventsConsumer := kafka.NewConsumer(a.cfg.Kafka.Brokers, a.cfg.Kafka.Topics.FileEvents, a.cfg.Kafka.ConsumerGroup, a.logger)
+	defer fileEventsConsumer.Close()
+	
+	storageEventsConsumer := kafka.NewConsumer(a.cfg.Kafka.Brokers, a.cfg.Kafka.Topics.StorageEvents, a.cfg.Kafka.ConsumerGroup, a.logger)
+	defer storageEventsConsumer.Close()
+
 	// 4. WebSocket Hub
 	hub := websocket.NewHub(a.logger)
 	go hub.Run(ctx)
@@ -63,6 +71,19 @@ func (a *App) Run() error {
 	changelogService := service.NewChangelogService(changelogRepo)
 	conflictService := service.NewConflictService(conflictRepo)
 	syncService := service.NewSyncService(deviceRepo, syncStateRepo, changelogRepo, conflictRepo, producer, a.logger)
+
+	// 5.1. Start Kafka Consumers
+	go func() {
+		fileEventsConsumer.Consume(ctx, func(msg kafkalib.Message) error {
+			return syncService.HandleFileEvent(ctx, msg)
+		})
+	}()
+
+	go func() {
+		storageEventsConsumer.Consume(ctx, func(msg kafkalib.Message) error {
+			return syncService.HandleStorageEvent(ctx, msg)
+		})
+	}()
 
 	// 6. gRPC Server
 	grpcHandler := grpc.NewSyncHandler(deviceService, syncService, changelogService, conflictService)

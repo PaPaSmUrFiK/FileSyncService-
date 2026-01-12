@@ -4,6 +4,24 @@ server:
 spring:
   application:
     name: auth-service
+  autoconfigure:
+    exclude:
+      - org.springframework.cloud.consul.discovery.ConsulCatalogWatchAutoConfiguration
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: true
+        service-name: auth-service
+        health-check-path: /actuator/health
+        health-check-interval: 60s
+        health-check-timeout: 10s
+        health-check-critical-timeout: 180s
+        instance-id: ${spring.application.name}-${random.value}
+        prefer-ip-address: false
+        fail-fast: false
+        register-health-check: true
 
   datasource:
     url: jdbc:postgresql://localhost:5433/auth_db
@@ -56,5 +74,15 @@ spring:
     user: filesync
     password: secret
 
+  kafka:
+    bootstrap-servers: kafka:29092
+
+
 grpc:
   # Client config would go here if AuthService calls others
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

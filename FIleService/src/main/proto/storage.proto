@@ -1,59 +1,53 @@
 syntax = "proto3";
 
-package storage;
+package filesync.storage.v1;
 
 option java_multiple_files = true;
-option java_package = "com.storageservice.grpc";
+option java_package = "com.filesync.storage.v1.grpc";
 
 service StorageService {
-  rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse);
-  rpc CopyFile(CopyFileRequest) returns (CopyFileResponse);
-  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
-  rpc GetUploadUrl(GetUploadUrlRequest) returns (GetUploadUrlResponse);
-  rpc GetDownloadUrl(GetDownloadUrlRequest) returns (GetDownloadUrlResponse);
+  rpc GetUploadUrl(UploadUrlRequest) returns (UrlResponse);
+  rpc GetDownloadUrl(DownloadUrlRequest) returns (UrlResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (EmptyResponse);
+  rpc CopyFile(CopyFileRequest) returns (EmptyResponse);
+  rpc ConfirmUpload(ConfirmUploadRequest) returns (EmptyResponse);
 }
 
-message GetUploadUrlRequest {
+message UploadUrlRequest {
   string file_id = 1;
+  string file_name = 2;
+  int64 file_size = 3;
+  string mime_type = 4;
+  int32 version = 5;
 }
 
-message GetUploadUrlResponse {
-  string upload_url = 1;
-}
-
-message GetDownloadUrlRequest {
+message DownloadUrlRequest {
   string file_id = 1;
-}
-
-message GetDownloadUrlResponse {
-  string download_url = 1;
-}
-
-
-message ConfirmUploadRequest {
-  string file_id = 1;
-  bool success = 2;
-  string storage_path = 3;
-}
-
-message ConfirmUploadResponse {
-  bool acknowledged = 1;
-}
-
-message CopyFileRequest {
-  string source_path = 1;
-  string destination_path = 2;
-}
-
-message CopyFileResponse {
-  bool success = 1;
-  string new_storage_path = 2;
+  optional int32 version = 2;
+  string file_name = 3;
 }
 
 message DeleteFileRequest {
-  string storage_path = 1;
+  string file_id = 1;
+  optional int32 version = 2;
 }
 
-message DeleteFileResponse {
-  bool success = 1;
+message CopyFileRequest {
+  string source_file_id = 1;
+  string destination_file_id = 2;
 }
+
+message ConfirmUploadRequest {
+  string file_id = 1;
+  int32 version = 2;
+  string hash = 3;
+}
+
+message UrlResponse {
+  string url = 1;
+  string method = 2;
+  int64 expires_in = 3;
+  map<string, string> headers = 4;
+}
+
+message EmptyResponse {}

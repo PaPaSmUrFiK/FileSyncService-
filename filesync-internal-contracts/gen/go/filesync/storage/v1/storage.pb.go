@@ -99,8 +99,9 @@ func (x *UploadUrlRequest) GetVersion() int32 {
 
 type DownloadUrlRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // ID файла
-	Version       *int32                 `protobuf:"varint,2,opt,name=version,proto3,oneof" json:"version,omitempty"`      // Конкретная версия (если не указана — последняя)
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`       // ID файла
+	Version       *int32                 `protobuf:"varint,2,opt,name=version,proto3,oneof" json:"version,omitempty"`            // Конкретная версия (если не указана — последняя)
+	FileName      string                 `protobuf:"bytes,3,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"` // Имя файла
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -147,6 +148,13 @@ func (x *DownloadUrlRequest) GetVersion() int32 {
 		return *x.Version
 	}
 	return 0
+}
+
+func (x *DownloadUrlRequest) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
 }
 
 type DeleteFileRequest struct {
@@ -427,10 +435,11 @@ const file_filesync_storage_v1_storage_proto_rawDesc = "" +
 	"\tfile_name\x18\x02 \x01(\tR\bfileName\x12\x1b\n" +
 	"\tfile_size\x18\x03 \x01(\x03R\bfileSize\x12\x1b\n" +
 	"\tmime_type\x18\x04 \x01(\tR\bmimeType\x12\x18\n" +
-	"\aversion\x18\x05 \x01(\x05R\aversion\"X\n" +
+	"\aversion\x18\x05 \x01(\x05R\aversion\"u\n" +
 	"\x12DownloadUrlRequest\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x1d\n" +
-	"\aversion\x18\x02 \x01(\x05H\x00R\aversion\x88\x01\x01B\n" +
+	"\aversion\x18\x02 \x01(\x05H\x00R\aversion\x88\x01\x01\x12\x1b\n" +
+	"\tfile_name\x18\x03 \x01(\tR\bfileNameB\n" +
 	"\n" +
 	"\b_version\"W\n" +
 	"\x11DeleteFileRequest\x12\x17\n" +

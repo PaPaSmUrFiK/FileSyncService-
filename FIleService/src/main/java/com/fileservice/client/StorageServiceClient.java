@@ -1,6 +1,6 @@
 package com.fileservice.client;
 
-import com.storageservice.grpc.*;
+import com.filesync.storage.v1.grpc.*;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Service;
 
@@ -10,11 +10,11 @@ public class StorageServiceClient {
     @GrpcClient("storage-service")
     private StorageServiceGrpc.StorageServiceBlockingStub storageServiceStub;
 
-    public void confirmUpload(String fileId, boolean success, String storagePath) {
+    public void confirmUpload(String fileId, int version, String hash) {
         ConfirmUploadRequest request = ConfirmUploadRequest.newBuilder()
                 .setFileId(fileId)
-                .setSuccess(success)
-                .setStoragePath(storagePath)
+                .setVersion(version)
+                .setHash(hash)
                 .build();
 
         try {
@@ -24,60 +24,61 @@ public class StorageServiceClient {
         }
     }
 
-    public String copyFile(String sourcePath, String destinationPath) {
+    public void copyFile(String sourceFileId, String destinationFileId) {
         CopyFileRequest request = CopyFileRequest.newBuilder()
-                .setSourcePath(sourcePath)
-                .setDestinationPath(destinationPath)
+                .setSourceFileId(sourceFileId)
+                .setDestinationFileId(destinationFileId)
                 .build();
 
         try {
-            CopyFileResponse response = storageServiceStub.copyFile(request);
-            if (!response.getSuccess()) {
-                throw new RuntimeException("Storage service failed to copy file");
-            }
-            return response.getNewStoragePath();
+            storageServiceStub.copyFile(request);
         } catch (Exception e) {
             throw new RuntimeException("Failed to call copy file on storage service", e);
         }
     }
 
-    public void deleteFile(String storagePath) {
-        if (storagePath == null || storagePath.isEmpty()) {
-            return;
+    public void deleteFile(String fileId, Integer version) {
+        DeleteFileRequest.Builder builder = DeleteFileRequest.newBuilder()
+                .setFileId(fileId);
+
+        if (version != null) {
+            builder.setVersion(version);
         }
-        DeleteFileRequest request = DeleteFileRequest.newBuilder()
-                .setStoragePath(storagePath)
-                .build();
 
         try {
-            storageServiceStub.deleteFile(request);
+            storageServiceStub.deleteFile(builder.build());
         } catch (Exception e) {
-            // Cleanup failures shouldn't necessarily fail the main transaction,
-            // but we'll log it. For now throwing runtime exception as per strict
-            // requirement interpretation.
             throw new RuntimeException("Failed to delete file on storage service", e);
         }
     }
 
-    public String getUploadUrl(String fileId) {
-        GetUploadUrlRequest request = GetUploadUrlRequest.newBuilder()
+    public String getUploadUrl(String fileId, String fileName, long fileSize, String mimeType, int version) {
+        UploadUrlRequest request = UploadUrlRequest.newBuilder()
                 .setFileId(fileId)
+                .setFileName(fileName)
+                .setFileSize(fileSize)
+                .setMimeType(mimeType)
+                .setVersion(version)
                 .build();
         try {
-            GetUploadUrlResponse response = storageServiceStub.getUploadUrl(request);
-            return response.getUploadUrl();
+            UrlResponse response = storageServiceStub.getUploadUrl(request);
+            return response.getUrl();
         } catch (Exception e) {
             throw new RuntimeException("Failed to get upload url from storage service", e);
         }
     }
 
-    public String getDownloadUrl(String fileId) {
-        GetDownloadUrlRequest request = GetDownloadUrlRequest.newBuilder()
-                .setFileId(fileId)
-                .build();
+    public String getDownloadUrl(String fileId, Integer version) {
+        DownloadUrlRequest.Builder builder = DownloadUrlRequest.newBuilder()
+                .setFileId(fileId);
+
+        if (version != null) {
+            builder.setVersion(version);
+        }
+
         try {
-            GetDownloadUrlResponse response = storageServiceStub.getDownloadUrl(request);
-            return response.getDownloadUrl();
+            UrlResponse response = storageServiceStub.getDownloadUrl(builder.build());
+            return response.getUrl();
         } catch (Exception e) {
             throw new RuntimeException("Failed to get download url from storage service", e);
         }

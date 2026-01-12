@@ -63,23 +63,53 @@ public class FileService {
         }
 
         // Проверка квоты (размер файла)
-        if (!userServiceClient.checkQuota(file.getUserId(), file.getSize())) {
-            throw new IllegalArgumentException("User storage quota exceeded");
+        // Пропускаем проверку для папок (size=0), так как они не занимают место
+        if (file.getSize() > 0) {
+            try {
+                boolean hasQuota = userServiceClient.checkQuota(file.getUserId(), file.getSize());
+                if (!hasQuota) {
+                    log.warn("Quota check failed for user {}: requested size={}", file.getUserId(), file.getSize());
+                    throw new IllegalArgumentException(
+                            "User storage quota exceeded. Please free up some space or upgrade your plan.");
+                }
+            } catch (RuntimeException e) {
+                // Пробрасываем оригинальное сообщение об ошибке
+                log.error("Error checking quota for user {}: {}", file.getUserId(), e.getMessage());
+                throw new IllegalArgumentException("Failed to verify storage quota: " + e.getMessage(), e);
+            }
+        } else {
+            log.debug("Skipping quota check for folder or zero-size file: userId={}, isFolder={}",
+                    file.getUserId(), file.isFolder());
         }
 
         File savedFile = fileRepository.save(file);
 
-        // Обновляем использованное место
-        try {
-            userServiceClient.updateStorageUsed(savedFile.getUserId(), savedFile.getSize());
-        } catch (Exception e) {
-            log.error("Failed to update storage used for user {}", savedFile.getUserId(), e);
+        // Обновляем использованное место (только для файлов, не для папок)
+        if (savedFile.getSize() > 0) {
+            try {
+                userServiceClient.updateStorageUsed(savedFile.getUserId(), savedFile.getSize());
+            } catch (Exception e) {
+                log.error("Failed to update storage used for user {}", savedFile.getUserId(), e);
+            }
         }
+
+        // Set storage path synchronously BEFORE upload URL generation
+        // Format: files/{fileId}/v{version}/data (or just filename, but standardized)
+        // We use a clean path structure that is deterministic
+        String storagePath = String.format("files/%s/v%d/%s",
+                savedFile.getId(), savedFile.getVersion(), "data"); // "data" is the standard blob name
+        savedFile.setStoragePath(storagePath);
+        savedFile = fileRepository.save(savedFile);
 
         // Получаем Upload URL и проставляем в transient поле
         if (!savedFile.isFolder()) {
             try {
-                String uploadUrl = storageServiceClient.getUploadUrl(savedFile.getId().toString());
+                String uploadUrl = storageServiceClient.getUploadUrl(
+                        savedFile.getId().toString(),
+                        savedFile.getName(),
+                        savedFile.getSize(),
+                        savedFile.getMimeType(),
+                        savedFile.getVersion());
                 savedFile.setUploadUrl(uploadUrl);
             } catch (Exception e) {
                 log.error("Failed to get upload url for file {}", savedFile.getId(), e);
@@ -115,7 +145,8 @@ public class FileService {
         fileOpt.ifPresent(file -> {
             if (!file.isFolder()) {
                 try {
-                    String downloadUrl = storageServiceClient.getDownloadUrl(file.getId().toString());
+                    String downloadUrl = storageServiceClient.getDownloadUrl(file.getId().toString(),
+                            file.getVersion());
                     file.setDownloadUrl(downloadUrl);
                 } catch (Exception e) {
                     log.error("Failed to get download url for file {}", file.getId(), e);
@@ -156,6 +187,17 @@ public class FileService {
             existingFile.setMimeType(updatedFile.getMimeType());
         }
 
+        // Self-healing: Ensure storage_path is set before archiving if it's missing
+        // (legacy/broken data)
+        if (existingFile.getStoragePath() == null || existingFile.getStoragePath().isBlank()) {
+            String healedPath = String.format("files/%s/v%d/data",
+                    existingFile.getId(), existingFile.getVersion());
+            existingFile.setStoragePath(healedPath);
+            // Save immediately to ensure data consistency even if versioning fails later
+            existingFile = fileRepository.save(existingFile);
+            log.warn("Healed missing storage_path for file {}: {}", fileId, healedPath);
+        }
+
         // Если меняется размер или хеш, считаем что меняется контент -> версионирование
         if ((updatedFile.getSize() != null && !updatedFile.getSize().equals(existingFile.getSize())) ||
                 (updatedFile.getHash() != null && !updatedFile.getHash().equals(existingFile.getHash()))) {
@@ -191,6 +233,13 @@ public class FileService {
                 existingFile.setHash(updatedFile.getHash());
 
             existingFile.incrementVersion();
+
+            // Generate NEW storage path for the NEW version
+            // Format: files/{fileId}/v{version}/data
+            String newStoragePath = String.format("files/%s/v%d/%s",
+                    existingFile.getId(), existingFile.getVersion(), "data");
+            existingFile.setStoragePath(newStoragePath);
+            log.debug("Rotated to new storage path: {}", newStoragePath);
         }
 
         if (updatedFile.getStoragePath() != null) {
@@ -203,7 +252,12 @@ public class FileService {
         // Если контент меняется, или клиент явно просит - выдаем UploadUrl
         if (contentChanged) {
             try {
-                String uploadUrl = storageServiceClient.getUploadUrl(savedFile.getId().toString());
+                String uploadUrl = storageServiceClient.getUploadUrl(
+                        savedFile.getId().toString(),
+                        savedFile.getName(),
+                        savedFile.getSize(),
+                        savedFile.getMimeType(),
+                        savedFile.getVersion());
                 savedFile.setUploadUrl(uploadUrl);
             } catch (Exception e) {
                 log.error("Failed to get upload url for update file {}", savedFile.getId(), e);
@@ -238,16 +292,18 @@ public class FileService {
 
         // Уведомляем StorageService (согласно требованиям 1.4)
         try {
-            storageServiceClient.deleteFile(file.getStoragePath()); // Или fileId? Метод принимает path.
+            storageServiceClient.deleteFile(file.getId().toString(), null); // Delete all versions
         } catch (Exception e) {
             log.warn("Failed to notify storage service about deletion", e);
         }
 
-        // Обновляем квоту (освобождаем место)
-        try {
-            userServiceClient.updateStorageUsed(file.getUserId(), -file.getSize());
-        } catch (Exception e) {
-            log.error("Failed to update storage used (decrement) for user {}", file.getUserId(), e);
+        // Обновляем квоту (освобождаем место) - только для файлов, не для папок
+        if (file.getSize() > 0) {
+            try {
+                userServiceClient.updateStorageUsed(file.getUserId(), -file.getSize());
+            } catch (Exception e) {
+                log.error("Failed to update storage used (decrement) for user {}", file.getUserId(), e);
+            }
         }
 
         log.info("File soft deleted: id={}, userId={}", fileId, userId);

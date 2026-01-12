@@ -1,3 +1,6 @@
+-- Включаем расширение для UUID, если его нет
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- Основная таблица пользователей (синхронизирована с AuthService)
 CREATE TABLE users (
     id UUID PRIMARY KEY,

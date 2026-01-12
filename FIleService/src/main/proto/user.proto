@@ -3,33 +3,33 @@ syntax = "proto3";
 package user;
 
 option java_multiple_files = true;
-option java_package = "com.userservice.grpc";
+option java_package = "com.filesync.user.grpc";
 
 service UserService {
-  rpc CheckQuota(CheckQuotaRequest) returns (CheckQuotaResponse);
-  rpc UpdateStorageUsed(UpdateStorageUsedRequest) returns (UpdateStorageUsedResponse);
+  rpc CheckQuota(CheckQuotaRequest) returns (QuotaResponse);
+  rpc UpdateStorageUsed(UpdateStorageUsedRequest) returns (EmptyResponse);
   rpc GetUserById(GetUserByIdRequest) returns (UserDto);
   rpc GetUsersByIds(GetUsersByIdsRequest) returns (GetUsersByIdsResponse);
 }
 
 message CheckQuotaRequest {
   string user_id = 1;
-  int64 size = 2;
+  int64 file_size = 2;
 }
 
-message CheckQuotaResponse {
-  bool allowed = 1;
-  string message = 2;
+message QuotaResponse {
+  bool has_space = 1;
+  int64 available_space = 2;
+  int64 storage_used = 3;
+  int64 storage_quota = 4;
 }
 
 message UpdateStorageUsedRequest {
   string user_id = 1;
-  int64 delta = 2; // Positive for upload, negative for delete
+  int64 size_delta = 2; // Positive for upload, negative for delete
 }
 
-message UpdateStorageUsedResponse {
-  bool success = 1;
-  int64 new_usage = 2;
+message EmptyResponse {
 }
 
 message GetUserByIdRequest {

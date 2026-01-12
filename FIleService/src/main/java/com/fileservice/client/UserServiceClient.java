@@ -1,15 +1,19 @@
 package com.fileservice.client;
 
-import com.userservice.grpc.CheckQuotaRequest;
-import com.userservice.grpc.CheckQuotaResponse;
-import com.userservice.grpc.UpdateStorageUsedRequest;
-import com.userservice.grpc.UserServiceGrpc;
+import com.filesync.user.grpc.CheckQuotaRequest;
+import com.filesync.user.grpc.QuotaResponse;
+import com.filesync.user.grpc.UpdateStorageUsedRequest;
+import com.filesync.user.grpc.UserServiceGrpc;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class UserServiceClient {
 
     @GrpcClient("user-service")
@@ -18,26 +22,38 @@ public class UserServiceClient {
     public boolean checkQuota(UUID userId, long size) {
         CheckQuotaRequest request = CheckQuotaRequest.newBuilder()
                 .setUserId(userId.toString())
-                .setSize(size)
+                .setFileSize(size)
                 .build();
 
         try {
-            CheckQuotaResponse response = userServiceStub.checkQuota(request);
-            return response.getAllowed();
+            log.debug("Checking quota for user {} with file size {}", userId, size);
+            QuotaResponse response = userServiceStub.checkQuota(request);
+            boolean hasSpace = response.getHasSpace();
+            log.debug("Quota check result for user {}: hasSpace={}, available={}, used={}, total={}", 
+                    userId, hasSpace, response.getAvailableSpace(), response.getStorageUsed(), response.getStorageQuota());
+            return hasSpace;
+        } catch (StatusRuntimeException e) {
+            Status status = e.getStatus();
+            String errorMessage = status.getDescription() != null ? status.getDescription() : status.getCode().name();
+            log.error("gRPC error checking quota for user {}: {} - {}", userId, status.getCode(), errorMessage);
+            
+            // Если ошибка связана с недоступностью сервиса, бросаем понятное исключение
+            if (status.getCode() == Status.Code.UNAVAILABLE || status.getCode() == Status.Code.DEADLINE_EXCEEDED) {
+                throw new RuntimeException("User service is unavailable. Please try again later.", e);
+            }
+            
+            // Для остальных ошибок (например, INTERNAL) пробрасываем оригинальное сообщение
+            throw new RuntimeException("Failed to check quota: " + errorMessage, e);
         } catch (Exception e) {
-            // In case of error (e.g. user service down), we should decide policy.
-            // For now, let's assume fail-safe or rethrow.
-            // Requirements say strict contracts, but we don't want to block uploads if user
-            // service hiccups?
-            // Actually, quota check is critical.
-            throw new RuntimeException("Failed to check quota with user service", e);
+            log.error("Unexpected error checking quota for user {}: {}", userId, e.getMessage(), e);
+            throw new RuntimeException("Failed to check quota with user service: " + e.getMessage(), e);
         }
     }
 
     public void updateStorageUsed(UUID userId, long delta) {
         UpdateStorageUsedRequest request = UpdateStorageUsedRequest.newBuilder()
                 .setUserId(userId.toString())
-                .setDelta(delta)
+                .setSizeDelta(delta)
                 .build();
 
         try {

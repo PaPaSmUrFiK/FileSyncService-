@@ -22,12 +22,20 @@ RUN go build -o /app/migrator cmd/migrator/main.go
 
 FROM alpine:latest
 WORKDIR /app
+
+# Install tools for health check
+RUN apk add --no-cache netcat-openbsd
+
 COPY --from=builder /app/storage-service .
 COPY --from=builder /app/migrator .
 COPY StorageService/config/config.yaml ./config/
 COPY StorageService/migrations ./migrations
 
 EXPOSE 9094
+
+# Health check: проверяем доступность gRPC порта
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD nc -z localhost 9094 || exit 1
 
 # Default command starts the service
 CMD ["./storage-service"]

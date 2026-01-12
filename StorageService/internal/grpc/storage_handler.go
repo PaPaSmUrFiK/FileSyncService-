@@ -40,7 +40,7 @@ func (h *StorageHandler) GetDownloadUrl(ctx context.Context, req *storagev1.Down
 		v := req.GetVersion()
 		version = &v
 	}
-	url, err := h.service.GetDownloadUrl(ctx, req.FileId, version)
+	url, err := h.service.GetDownloadUrl(ctx, req.FileId, version, req.FileName)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -80,10 +80,12 @@ func (h *StorageHandler) CopyFile(ctx context.Context, req *storagev1.CopyFileRe
 func (h *StorageHandler) ConfirmUpload(ctx context.Context, req *storagev1.ConfirmUploadRequest) (*storagev1.EmptyResponse, error) {
 	const op = "grpc.StorageHandler.ConfirmUpload"
 
-	// TODO: Брать bucket и path из конфига или логики сервиса
-	storagePath := "files/" + req.FileId + "/v1/data"
+	// Путь должен строго совпадать с тем, что в GetUploadUrl
+	storagePath := fmt.Sprintf("files/%s/v%d/data", req.FileId, req.Version)
 	bucket := "file-sync-storage"
 
+	// Мы не получаем размер в ConfirmUploadRequest, но он должен быть в базе или передан ранее.
+	// Для начала сохраним хотя бы путь корректно.
 	err := h.service.ConfirmUpload(ctx, req.FileId, req.Version, req.Hash, 0, storagePath, bucket)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)

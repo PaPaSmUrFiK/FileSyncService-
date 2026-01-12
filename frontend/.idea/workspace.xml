@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d1be2a8b-8041-4601-812e-ccac6e75b479" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../AuthService/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/grpc/AuthGrpcService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/grpc/AuthGrpcService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/grpc/GrpcExceptionMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/grpc/GrpcExceptionMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/grpc/JwtGrpcInterceptor.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/grpc/JwtGrpcInterceptor.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/model/domain/RefreshToken.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/model/domain/RefreshToken.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/model/domain/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/model/domain/User.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/repository/RoleRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/repository/RoleRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/repository/UserRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/repository/UserRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/security/JwtTokenProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/security/JwtTokenProvider.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/service/AuthService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/service/AuthService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/service/AuthServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/service/AuthServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/service/RoleServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/java/com/authservice/service/RoleServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../AuthService/src/main/resources/application.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../AuthService/src/main/resources/application.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/client/StorageServiceClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/client/StorageServiceClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/client/UserServiceClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/client/UserServiceClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/kafka/KafkaProducerService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/kafka/KafkaProducerService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/model/File.java" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/model/File.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/service/FileService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/service/FileService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/service/VersionService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/java/com/fileservice/service/VersionService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/proto/storage.proto" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/proto/storage.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/proto/user.proto" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/proto/user.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../FIleService/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/../FIleService/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../StorageService/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/../StorageService/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../StorageService/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/../StorageService/config/config.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../StorageService/internal/app/app.go" beforeDir="false" afterPath="$PROJECT_DIR$/../StorageService/internal/app/app.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../StorageService/internal/grpc/storage_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/../StorageService/internal/grpc/storage_handler.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../StorageService/internal/service/storage.go" beforeDir="false" afterPath="$PROJECT_DIR$/../StorageService/internal/service/storage.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../StorageService/internal/storage/minio/client.go" beforeDir="false" afterPath="$PROJECT_DIR$/../StorageService/internal/storage/minio/client.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../SyncService/.idea/SyncService.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../SyncService/.idea/SyncService.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../SyncService/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/../SyncService/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../SyncService/internal/app/app.go" beforeDir="false" afterPath="$PROJECT_DIR$/../SyncService/internal/app/app.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../SyncService/internal/service/sync.go" beforeDir="false" afterPath="$PROJECT_DIR$/../SyncService/internal/service/sync.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/grpc/UserGrpcService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/grpc/UserGrpcService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/model/domain/AdminAction.java" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/model/domain/AdminAction.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/service/UserService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/service/impl/UserServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/service/impl/UserServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/service/messaging/KafkaConsumerService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/java/com/filesync/userservice/service/messaging/KafkaConsumerService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/java/com/userservice/UserServiceApplication.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UserService/src/main/resources/db/migration/V1__init_schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/../UserService/src/main/resources/db/migration/V1__init_schema.sql" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 8
+}</component>
+  <component name="ProjectId" id="37oSEieAhfgCtc8dwjVeLlY2L7j" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-1632447f56bf-JavaScript-WS-243.26053.12" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d1be2a8b-8041-4601-812e-ccac6e75b479" name="Changes" comment="" />
+      <created>1767567826463</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1767567826463</updated>
+      <workItem from="1767567829290" duration="1746000" />
+      <workItem from="1767577468438" duration="1343000" />
+      <workItem from="1767593827757" duration="1579000" />
+      <workItem from="1767613032823" duration="1960000" />
+      <workItem from="1768067065046" duration="3677000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

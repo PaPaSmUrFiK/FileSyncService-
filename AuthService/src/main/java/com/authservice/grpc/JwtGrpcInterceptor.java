@@ -59,6 +59,7 @@ public class JwtGrpcInterceptor implements ServerInterceptor {
         return fullMethodName.endsWith("Register")
                 || fullMethodName.endsWith("Login")
                 || fullMethodName.endsWith("RefreshToken")
-                || fullMethodName.endsWith("ValidateToken");
+                || fullMethodName.endsWith("ValidateToken")
+                || fullMethodName.endsWith("Logout");  // Logout не требует токен, использует refreshToken
     }
 }

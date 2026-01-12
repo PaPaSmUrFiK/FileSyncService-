@@ -7,13 +7,16 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 @Component
+@Slf4j
 public class JwtTokenProvider {
 
     private static final String ROLES_CLAIM = "roles";
@@ -76,7 +79,11 @@ public class JwtTokenProvider {
         try {
             parseClaims(token);
             return true;
+        } catch (ExpiredJwtException ex) {
+            log.warn("Token expired: {}", ex.getMessage());
+            return false;
         } catch (JwtException | IllegalArgumentException ex) {
+            log.warn("Token validation failed: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
             return false;
         }
     }
@@ -95,9 +102,21 @@ public class JwtTokenProvider {
 
     @SuppressWarnings("unchecked")
     public Set<String> getRoles(String token) {
-        return Set.copyOf(
-                parseClaims(token).get(ROLES_CLAIM, Set.class)
-        );
+        Object rolesClaim = parseClaims(token).get(ROLES_CLAIM);
+        if (rolesClaim == null) {
+            return Set.of();
+        }
+        
+        // JWT декодирует массивы как List, а не Set
+        if (rolesClaim instanceof List) {
+            List<String> rolesList = (List<String>) rolesClaim;
+            return Set.copyOf(rolesList);
+        } else if (rolesClaim instanceof Set) {
+            return (Set<String>) rolesClaim;
+        } else {
+            // Fallback: если claim не List и не Set, пытаемся прочитать как List
+            return Set.copyOf(parseClaims(token).get(ROLES_CLAIM, List.class));
+        }
     }
 
     /* =========================

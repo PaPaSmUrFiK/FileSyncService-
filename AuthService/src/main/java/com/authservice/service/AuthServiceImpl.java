@@ -9,6 +9,7 @@ import com.authservice.repository.RoleRepository;
 import com.authservice.repository.UserRepository;
 import com.authservice.security.JwtTokenProvider;
 import com.authservice.service.dto.TokenPairDto;
+import com.authservice.service.messaging.KafkaProducerService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RoleService roleService;
+    private final KafkaProducerService kafkaProducerService;
 
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpirationSeconds;
@@ -57,6 +59,9 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         userRepository.save(user);
+
+        // Publish registration event for other services (e.g. UserService)
+        kafkaProducerService.sendUserRegisteredEvent(user.getId(), user.getEmail(), user.getName());
 
         return issueTokens(user, null);
     }

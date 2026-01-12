@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package notification;
+
+option java_package = "com.notificationservice.grpc";
+option java_multiple_files = true;
+
+service NotificationService {
+  // Отправка уведомлений
+  rpc SendNotification(SendNotificationRequest) returns (EmptyResponse);
+  rpc SendBulkNotifications(SendBulkNotificationsRequest) returns (BulkSendResponse);
+  
+  // Получение уведомлений
+  rpc GetNotifications(GetNotificationsRequest) returns (NotificationListResponse);
+  rpc GetUnreadCount(GetUnreadCountRequest) returns (UnreadCountResponse);
+  
+  // Управление уведомлениями
+  rpc MarkAsRead(MarkAsReadRequest) returns (EmptyResponse);
+  rpc MarkAllAsRead(MarkAllAsReadRequest) returns (EmptyResponse);
+  rpc DeleteNotification(DeleteNotificationRequest) returns (EmptyResponse);
+  
+  // Push токены
+  rpc RegisterPushToken(RegisterPushTokenRequest) returns (EmptyResponse);
+  rpc UnregisterPushToken(UnregisterPushTokenRequest) returns (EmptyResponse);
+  
+  // Настройки уведомлений
+  rpc GetPreferences(GetPreferencesRequest) returns (PreferencesResponse);
+  rpc UpdatePreferences(UpdatePreferencesRequest) returns (PreferencesResponse);
+}
+
+message SendNotificationRequest {
+  string user_id = 1;
+  string notification_type = 2;
+  string title = 3;
+  string message = 4;
+  string priority = 5; // low, normal, high, urgent
+  map<string, string> data = 6;
+  repeated string channels = 7; // email, push, websocket
+}
+
+message SendBulkNotificationsRequest {
+  repeated string user_ids = 1;
+  string notification_type = 2;
+  string title = 3;
+  string message = 4;
+  string priority = 5;
+  map<string, string> data = 6;
+  repeated string channels = 7;
+}
+
+message BulkSendResponse {
+  int32 total = 1;
+  int32 sent = 2;
+  int32 failed = 3;
+  repeated string failed_user_ids = 4;
+}
+
+message GetNotificationsRequest {
+  string user_id = 1;
+  optional bool unread_only = 2;
+  optional string notification_type = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message NotificationListResponse {
+  repeated NotificationInfo notifications = 1;
+  int32 total = 2;
+  int32 unread_count = 3;
+}
+
+message NotificationInfo {
+  string id = 1;
+  string notification_type = 2;
+  string title = 3;
+  string message = 4;
+  string priority = 5;
+  bool is_read = 6;
+  map<string, string> data = 7;
+  string created_at = 8;
+  optional string read_at = 9;
+}
+
+message GetUnreadCountRequest {
+  string user_id = 1;
+}
+
+message UnreadCountResponse {
+  int32 count = 1;
+}
+
+message MarkAsReadRequest {
+  string notification_id = 1;
+  string user_id = 2;
+}
+
+message MarkAllAsReadRequest {
+  string user_id = 1;
+}
+
+message DeleteNotificationRequest {
+  string notification_id = 1;
+  string user_id = 2;
+}
+
+message RegisterPushTokenRequest {
+  string user_id = 1;
+  string device_id = 2;
+  string token = 3;
+  string platform = 4; // fcm, apns
+}
+
+message UnregisterPushTokenRequest {
+  string user_id = 1;
+  string device_id = 2;
+}
+
+message GetPreferencesRequest {
+  string user_id = 1;
+}
+
+message UpdatePreferencesRequest {
+  string user_id = 1;
+  optional bool email_enabled = 2;
+  optional bool push_enabled = 3;
+  optional bool websocket_enabled = 4;
+  optional bool file_notifications = 5;
+  optional bool sync_notifications = 6;
+  optional bool share_notifications = 7;
+  optional bool admin_notifications = 8;
+  optional bool system_notifications = 9;
+  optional bool quiet_hours_enabled = 10;
+  optional string quiet_hours_start = 11;
+  optional string quiet_hours_end = 12;
+}
+
+message PreferencesResponse {
+  string user_id = 1;
+  bool email_enabled = 2;
+  bool push_enabled = 3;
+  bool websocket_enabled = 4;
+  bool file_notifications = 5;
+  bool sync_notifications = 6;
+  bool share_notifications = 7;
+  bool admin_notifications = 8;
+  bool system_notifications = 9;
+  bool quiet_hours_enabled = 10;
+  optional string quiet_hours_start = 11;
+  optional string quiet_hours_end = 12;
+}
+
+message EmptyResponse {}
+

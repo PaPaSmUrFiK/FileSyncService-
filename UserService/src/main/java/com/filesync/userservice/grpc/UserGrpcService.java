@@ -4,6 +4,7 @@ import com.filesync.user.grpc.*;
 import com.filesync.userservice.model.domain.User;
 import com.filesync.userservice.model.domain.UserQuota;
 import com.filesync.userservice.model.domain.UserSettings;
+import com.filesync.userservice.repository.UserQuotaRepository;
 import com.filesync.userservice.service.StatisticsService;
 import com.filesync.userservice.service.UserService;
 import com.filesync.userservice.service.integration.AuthServiceClient;
@@ -14,6 +15,7 @@ import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     private final UserService userService;
     private final StatisticsService statisticsService;
     private final AuthServiceClient authServiceClient;
+    private final UserQuotaRepository userQuotaRepository;
 
     // --- User Operations ---
 
@@ -105,24 +108,95 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     }
 
     @Override
+    @Transactional
     public void checkQuota(CheckQuotaRequest request, StreamObserver<QuotaResponse> responseObserver) {
+        final UUID userId;
         try {
-            UserQuota quota = userService.checkQuota(UUID.fromString(request.getUserId()), request.getFileSize());
-            User user = quota.getUser();
+            userId = UUID.fromString(request.getUserId());
+            long requestedSize = request.getFileSize();
+            log.debug("Checking quota for user {} with file size {}", userId, requestedSize);
 
-            long available = user.getStorageQuota() - user.getStorageUsed();
-            boolean hasSpace = available >= request.getFileSize();
+            UserQuota quota = null;
+            User user = null;
+
+            try {
+                // Пытаемся получить квоту через севис (который теперь @Transactional)
+                quota = userService.checkQuota(userId, requestedSize);
+                user = quota.getUser();
+            } catch (RuntimeException e) {
+                // Если пользователь или квота не найдены, создаем профиль
+                String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+                if (errorMsg.contains("quota not found") || errorMsg.contains("user not found")
+                        || errorMsg.contains("not found")) {
+                    log.info("User or quota not found for userId={}, creating default profile", userId);
+                    try {
+                        // createUser сам создаст все зависимости (квоту и настройки)
+                        user = userService.createUser(userId, "user-" + userId + "@example.com", "User");
+                        quota = userQuotaRepository.findByUserId(userId)
+                                .orElseThrow(() -> new RuntimeException(
+                                        "Failed to retrieve created quota for user: " + userId));
+                    } catch (Exception createEx) {
+                        log.error("Failed to recover user/quota for userId={}: {}", userId, createEx.getMessage(),
+                                createEx);
+                        responseObserver.onError(io.grpc.Status.INTERNAL
+                                .withDescription("Failed to initialize user quota: " + createEx.getMessage())
+                                .asRuntimeException());
+                        return;
+                    }
+                } else {
+                    log.error("Error in checkQuota service call for userId={}: {}", userId, e.getMessage(), e);
+                    throw e;
+                }
+            }
+
+            // На этом этапе у нас должны быть и user, и quota
+            if (user == null || quota == null) {
+                log.error("Critical failure: user or quota is still null after recovery for userId={}", userId);
+                responseObserver.onError(io.grpc.Status.INTERNAL
+                        .withDescription("Internal error: data missing after quota initialization")
+                        .asRuntimeException());
+                return;
+            }
+
+            // Получаем лимиты
+            long currentUsed = user.getStorageUsed() != null ? user.getStorageUsed() : 0L;
+            long totalQuota = user.getStorageQuota() != null ? user.getStorageQuota() : 5368709120L; // Default 5GB
+            long maxFileLimit = quota.getMaxFileSize() != null ? quota.getMaxFileSize() : 104857600L; // Default 100MB
+
+            long available = totalQuota - currentUsed;
+
+            // Проверка: достаточно ли общего места И не превышает ли файл лимит плана
+            boolean hasSpace = (available >= requestedSize);
+            boolean isWithinLimit = (requestedSize <= maxFileLimit);
+
+            boolean finalResult = hasSpace && isWithinLimit;
+
+            log.info("Quota check result for user {}: requested={}, available={}, maxFile={}, result={}",
+                    userId, requestedSize, available, maxFileLimit, finalResult);
+
+            if (!isWithinLimit && requestedSize > 0) {
+                log.warn("File size {} exceeds max file limit {} for user {}", requestedSize, maxFileLimit, userId);
+            }
 
             QuotaResponse response = QuotaResponse.newBuilder()
-                    .setHasSpace(hasSpace)
-                    .setAvailableSpace(available)
-                    .setStorageUsed(user.getStorageUsed())
-                    .setStorageQuota(user.getStorageQuota())
+                    .setHasSpace(finalResult)
+                    .setAvailableSpace(Math.max(0, available))
+                    .setStorageUsed(currentUsed)
+                    .setStorageQuota(totalQuota)
                     .build();
+
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid UUID in checkQuota: {}", request.getUserId());
+            responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                    .withDescription("Invalid user ID format")
+                    .asRuntimeException());
         } catch (Exception e) {
-            responseObserver.onError(e);
+            log.error("Unhandled error in checkQuota for user {}: {}", request.getUserId(), e.getMessage(), e);
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("Internal error checking quota: " + e.getMessage())
+                    .asRuntimeException());
         }
     }
 

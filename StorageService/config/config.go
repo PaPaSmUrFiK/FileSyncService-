@@ -8,11 +8,11 @@ import (
 )
 
 type Config struct {
-	Env      string `yaml:"env" env-default:"local"`
-	GRPC     GRPCConfig `yaml:"grpc"`
+	Env      string         `yaml:"env" env-default:"local"`
+	GRPC     GRPCConfig     `yaml:"grpc"`
 	Postgres PostgresConfig `yaml:"postgres"`
-	Minio    MinioConfig `yaml:"minio"`
-	Kafka    KafkaConfig `yaml:"kafka"`
+	Minio    MinioConfig    `yaml:"minio"`
+	Kafka    KafkaConfig    `yaml:"kafka"`
 }
 
 type GRPCConfig struct {

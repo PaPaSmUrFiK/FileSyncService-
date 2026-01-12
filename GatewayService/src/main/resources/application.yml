@@ -1,0 +1,164 @@
+server:
+  port: 8080
+  netty:
+    connection-timeout: 30s
+    idle-timeout: 300s
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # Отключаем Weight Calculator Web Filter т.к. он вызывает блокирующие вызовы (blockLast) в реактивном потоке
+      # Это известная проблема в Spring Cloud Gateway 4.x + Reactor
+      predicate:
+        weight:
+          enabled: false
+      # Отключаем автоматическое обнаружение маршрутов из Consul (используем статические маршруты)
+      # Это предотвращает ошибки WeightCalculatorWebFilter при обновлении маршрутов
+      discovery:
+        locator:
+          enabled: false
+          lower-case-service-id: true
+      # globalcors удален, т.к. используется CorsWebFilter в SecurityConfig.java
+      routes:
+        # AUTH SERVICE
+        - id: auth-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через фильтр
+          predicates:
+            - Path=/api/v1/auth/**
+          filters:
+            - name: Auth  # Используем наш AuthGatewayFilterFactory
+            - name: CircuitBreaker
+              args:
+                name: authCircuitBreaker
+                fallbackUri: forward:/fallback/auth
+
+        # USER SERVICE - обрабатывается UserController
+        - id: user-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через контроллер
+          predicates:
+            - Path=/api/v1/users/me,/api/v1/users/me/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1000ms
+                  factor: 2
+
+        # ADMIN USER SERVICE - обрабатывается AdminUserController
+        - id: admin-user-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через контроллер
+          predicates:
+            - Path=/api/v1/admin/users/**,/api/v1/admin/statistics/**
+          filters:
+            - name: AdminRoleFilter
+
+        # FILE SERVICE - обрабатывается FileController
+        - id: file-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через контроллер
+          predicates:
+            - Path=/api/v1/files/**,/api/v1/folders/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1000ms
+                  factor: 2
+            - name: CircuitBreaker
+              args:
+                name: fileCircuitBreaker
+                fallbackUri: forward:/fallback/file
+
+        # STORAGE SERVICE - обрабатывается StorageController
+        - id: storage-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через контроллер
+          predicates:
+            - Path=/api/v1/storage/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: storageCircuitBreaker
+                fallbackUri: forward:/fallback/storage
+
+        # SYNC SERVICE - обрабатывается SyncController
+        - id: sync-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через контроллер
+          predicates:
+            - Path=/api/v1/sync/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: syncCircuitBreaker
+                fallbackUri: forward:/fallback/sync
+
+        # NOTIFICATION SERVICE - REST API обрабатывается NotificationController
+        - id: notification-service
+          uri: no://op  # Не проксируем на другой сервис, обрабатываем через контроллер
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1000ms
+                  factor: 2
+            - name: CircuitBreaker
+              args:
+                name: notificationCircuitBreaker
+                fallbackUri: forward:/fallback/notification
+
+        # NOTIFICATION SERVICE - WebSocket проксирование
+        - id: notification-websocket
+          uri: http://notification-service:8085  # Используем прямой URI для надежности
+          predicates:
+            - Path=/ws/notifications/**
+          filters:
+            - name: WebSocketAuth  # Используем специальный фильтр для WebSocket аутентификации
+            # Для WebSocket не используем CircuitBreaker и RateLimiter, так как это долгоживущие соединения
+
+        # SYNC SERVICE - WebSocket проксирование
+        - id: sync-websocket
+          uri: ${SYNC_SERVICE_HTTP_URL:http://sync-service:8084}  # Проксируем WebSocket на sync-service (Go сервис на HTTP порту)
+          predicates:
+            - Path=/ws/sync/**
+          filters:
+            - name: WebSocketAuth  # Используем специальный фильтр для WebSocket аутентификации
+            # Для WebSocket не используем CircuitBreaker и RateLimiter, так как это долгоживущие соединения
+
+    consul:
+      enabled: false  # Полностью отключаем Consul для Gateway
+
+
+# gRPC Client Configuration
+# Используем префикс static:// чтобы принудительно использовать прямые адреса вместо service discovery
+grpc:
+  client:
+    auth-service:
+      address: static://${AUTH_SERVICE_HOST:auth-service}:${AUTH_SERVICE_PORT:9091}
+      negotiationType: PLAINTEXT
+    user-service:
+      address: static://${USER_SERVICE_HOST:user-service}:${USER_SERVICE_PORT:9090}
+      negotiationType: PLAINTEXT
+    file-service:
+      address: static://${FILE_SERVICE_HOST:file-service}:${FILE_SERVICE_PORT:9093}
+      negotiationType: PLAINTEXT
+    storage-service:
+      address: static://${STORAGE_SERVICE_HOST:storage-service}:${STORAGE_SERVICE_PORT:9094}
+      negotiationType: PLAINTEXT
+    sync-service:
+      address: static://${SYNC_SERVICE_HOST:sync-service}:${SYNC_SERVICE_PORT:9095}
+      negotiationType: PLAINTEXT
+    notification-service:
+      address: static://${NOTIFICATION_SERVICE_HOST:notification-service}:${NOTIFICATION_SERVICE_PORT:9096}
+      negotiationType: PLAINTEXT

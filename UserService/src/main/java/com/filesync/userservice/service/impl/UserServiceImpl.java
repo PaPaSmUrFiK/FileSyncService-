@@ -29,9 +29,57 @@ public class UserServiceImpl implements UserService {
     private final AdminActionRepository adminActionRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public User getUser(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+    }
+
+    @Override
+    @Transactional
+    public User createUser(UUID userId, String email, String name) {
+        User user = userRepository.findById(userId).orElseGet(() -> {
+            User newUser = User.builder()
+                    .id(userId)
+                    .email(email)
+                    .name(name != null ? name : "User")
+                    .storageUsed(0L)
+                    .storageQuota(5368709120L) // 5GB default
+                    .build();
+
+            log.info("Creating new user entity: {}", userId);
+            return userRepository.saveAndFlush(newUser);
+        });
+
+        // Гарантируем наличие квоты
+        if (userQuotaRepository.findByUserId(userId).isEmpty()) {
+            log.info("Manually creating quota for user: {}", userId);
+            userQuotaRepository.save(UserQuota.builder()
+                    .user(user)
+                    .planType("free")
+                    .maxFileSize(104857600L) // 100MB
+                    .maxDevices(3)
+                    .maxShares(10)
+                    .versionHistoryDays(30)
+                    .validFrom(java.time.LocalDateTime.now())
+                    .build());
+        }
+
+        // Гарантируем наличие настроек
+        if (userSettingsRepository.findByUserId(userId).isEmpty()) {
+            log.info("Manually creating settings for user: {}", userId);
+            userSettingsRepository.save(UserSettings.builder()
+                    .user(user)
+                    .theme("light")
+                    .language("en")
+                    .notificationsEnabled(true)
+                    .emailNotifications(true)
+                    .autoSync(true)
+                    .syncOnMobileData(false)
+                    .build());
+        }
+
+        return user;
     }
 
     @Override
@@ -53,6 +101,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserSettings getUserSettings(UUID userId) {
         return userSettingsRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Settings not found for user: " + userId));
@@ -80,13 +129,30 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserQuota checkQuota(UUID userId, long fileSize) {
-        // Just return the quota object, calling logic decides if check passes?
-        // Or throw exception?
-        // The prompt says "CheckQuota(Request) returns (QuotaResponse)" which has bool
-        // has_space.
-        return userQuotaRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Quota not found for user: " + userId));
+        log.debug("Checking quota for user {} with file size {}", userId, fileSize);
+
+        UserQuota quota = userQuotaRepository.findByUserId(userId)
+                .orElse(null);
+
+        if (quota == null) {
+            log.warn("Quota not found for user {}, this should have been created by trigger or createUser", userId);
+            throw new RuntimeException("Quota not found for user: " + userId);
+        }
+
+        // Проверяем, что у пользователя есть запись в таблице users
+        User user = quota.getUser();
+        if (user == null) {
+            log.warn("User record not found for quota userId={}", userId);
+            throw new RuntimeException("User record not found for userId: " + userId);
+        }
+
+        // Предотвращаем LazyInitializationException путем обращения к свойствам user
+        log.debug("Quota found for user {}: plan={}, used={}, quota={}",
+                userId, quota.getPlanType(), user.getStorageUsed(), user.getStorageQuota());
+
+        return quota;
     }
 
     @Override

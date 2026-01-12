@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface UserService {
     User getUser(UUID userId);
 
+    User createUser(UUID userId, String email, String name);
+
     User updateUser(UUID userId, String name, String avatarUrl);
 
     void deleteUser(UUID userId);

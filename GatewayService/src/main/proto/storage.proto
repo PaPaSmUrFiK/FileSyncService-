@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package filesync.storage.v1;
+
+option java_package = "com.filesync.storage.v1.grpc";
+option java_multiple_files = true;
+
+service StorageService {
+  rpc GetUploadUrl(UploadUrlRequest) returns (UrlResponse);
+  rpc GetDownloadUrl(DownloadUrlRequest) returns (UrlResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (EmptyResponse);
+  rpc CopyFile(CopyFileRequest) returns (EmptyResponse);
+  rpc ConfirmUpload(ConfirmUploadRequest) returns (EmptyResponse);
+}
+
+message UploadUrlRequest {
+  string file_id = 1;
+  string file_name = 2;
+  int64 file_size = 3;
+  string mime_type = 4;
+  int32 version = 5;
+}
+
+message DownloadUrlRequest {
+  string file_id = 1;
+  optional int32 version = 2;
+  string file_name = 3;
+}
+
+message DeleteFileRequest {
+  string file_id = 1;
+  optional int32 version = 2;
+}
+
+message CopyFileRequest {
+  string source_file_id = 1;
+  string destination_file_id = 2;
+}
+
+message ConfirmUploadRequest {
+  string file_id = 1;
+  int32 version = 2;
+  string hash = 3;
+}
+
+message UrlResponse {
+  string url = 1;
+  string method = 2;
+  int64 expires_in = 3;
+  map<string, string> headers = 4;
+}
+
+message EmptyResponse {}
+

@@ -4,7 +4,7 @@ import com.authservice.exception.AuthException;
 import com.authservice.exception.TokenException;
 import com.authservice.exception.UserBlockedException;
 import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
+import io.grpc.StatusRuntimeException;
 import net.devh.boot.grpc.server.advice.GrpcAdvice;
 import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
 
@@ -13,51 +13,31 @@ import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
 public class GrpcExceptionMapper {
 
     @GrpcExceptionHandler(AuthException.class)
-    public void handleAuth(
-            AuthException ex,
-            StreamObserver<?> observer) {
-
-        observer.onError(
-                Status.UNAUTHENTICATED
-                        .withDescription(ex.getMessage())
-                        .asRuntimeException()
-        );
+    public StatusRuntimeException handleAuth(AuthException ex) {
+        return Status.UNAUTHENTICATED
+                .withDescription(ex.getMessage())
+                .asRuntimeException();
     }
 
     @GrpcExceptionHandler(TokenException.class)
-    public void handleToken(
-            TokenException ex,
-            StreamObserver<?> observer) {
-
-        observer.onError(
-                Status.UNAUTHENTICATED
-                        .withDescription(ex.getMessage())
-                        .asRuntimeException()
-        );
+    public StatusRuntimeException handleToken(TokenException ex) {
+        return Status.UNAUTHENTICATED
+                .withDescription(ex.getMessage())
+                .asRuntimeException();
     }
 
     @GrpcExceptionHandler(UserBlockedException.class)
-    public void handleBlocked(
-            UserBlockedException ex,
-            StreamObserver<?> observer) {
-
-        observer.onError(
-                Status.PERMISSION_DENIED
-                        .withDescription(ex.getMessage())
-                        .asRuntimeException()
-        );
+    public StatusRuntimeException handleBlocked(UserBlockedException ex) {
+        return Status.PERMISSION_DENIED
+                .withDescription(ex.getMessage())
+                .asRuntimeException();
     }
 
     @GrpcExceptionHandler(Exception.class)
-    public void handleUnknown(
-            Exception ex,
-            StreamObserver<?> observer) {
-
-        observer.onError(
-                Status.INTERNAL
-                        .withDescription("Internal auth service error")
-                        .asRuntimeException()
-        );
+    public StatusRuntimeException handleUnknown(Exception ex) {
+        return Status.INTERNAL
+                .withDescription("Internal auth service error: " + ex.getMessage())
+                .asRuntimeException();
     }
 }
 

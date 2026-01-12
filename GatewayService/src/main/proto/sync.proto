@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package filesync.sync.v1;
+
+option java_package = "com.filesync.sync.v1.grpc";
+option java_multiple_files = true;
+
+service SyncService {
+  rpc RegisterDevice(RegisterDeviceRequest) returns (DeviceResponse);
+  rpc GetSyncStatus(SyncStatusRequest) returns (SyncStatusResponse);
+  rpc PushChanges(PushChangesRequest) returns (PushChangesResponse);
+  rpc PullChanges(PullChangesRequest) returns (PullChangesResponse);
+  rpc ResolveConflict(ConflictResolutionRequest) returns (EmptyResponse);
+  rpc UnregisterDevice(UnregisterDeviceRequest) returns (EmptyResponse);
+  rpc GetDevices(GetDevicesRequest) returns (DevicesListResponse);
+}
+
+message RegisterDeviceRequest {
+  string user_id = 1;
+  string device_name = 2;
+  string device_type = 3;
+  string os = 4;
+  string os_version = 5;
+}
+
+message DeviceResponse {
+  string device_id = 1;
+  string sync_token = 2;
+  string registered_at = 3;
+}
+
+message SyncStatusRequest {
+  string device_id = 1;
+  string user_id = 2;
+}
+
+message SyncStatusResponse {
+  string device_id = 1;
+  string status = 2;
+  string last_sync = 3;
+  int32 pending_changes = 4;
+  int32 synced_files = 5;
+  string sync_cursor = 6;
+}
+
+message FileChange {
+  string file_id = 1;
+  string file_path = 2;
+  string change_type = 3;
+  string file_hash = 4;
+  int64 file_size = 5;
+  int32 local_version = 6;
+  string client_timestamp = 7;
+  optional string old_path = 8;
+}
+
+message PushChangesRequest {
+  string device_id = 1;
+  string user_id = 2;
+  repeated FileChange changes = 3;
+}
+
+message ChangeResult {
+  string file_id = 1;
+  string status = 2;
+  optional string upload_url = 3;
+  optional int32 server_version = 4;
+  optional string conflict_id = 5;
+  optional string error_message = 6;
+}
+
+message PushChangesResponse {
+  repeated ChangeResult results = 1;
+  string sync_cursor = 2;
+}
+
+message PullChangesRequest {
+  string device_id = 1;
+  string user_id = 2;
+  optional string last_sync_cursor = 3;
+}
+
+message FileChangeInfo {
+  string file_id = 1;
+  string change_type = 2;
+  string file_path = 3;
+  string file_name = 4;
+  int64 file_size = 5;
+  string file_hash = 6;
+  int32 version = 7;
+  string mime_type = 8;
+  bool is_folder = 9;
+  optional string download_url = 10;
+  string timestamp = 11;
+}
+
+message PullChangesResponse {
+  repeated FileChangeInfo changes = 1;
+  string sync_cursor = 2;
+  bool has_more = 3;
+}
+
+message ConflictResolutionRequest {
+  string conflict_id = 1;
+  string user_id = 2;
+  string resolution_type = 3;
+  optional string chosen_file_id = 4;
+}
+
+message UnregisterDeviceRequest {
+  string device_id = 1;
+  string user_id = 2;
+}
+
+message GetDevicesRequest {
+  string user_id = 1;
+}
+
+message DeviceInfo {
+  string device_id = 1;
+  string device_name = 2;
+  string device_type = 3;
+  string os = 4;
+  string last_sync = 5;
+  bool is_online = 6;
+}
+
+message DevicesListResponse {
+  repeated DeviceInfo devices = 1;
+}
+
+message EmptyResponse {}
+

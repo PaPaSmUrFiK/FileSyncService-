@@ -38,6 +38,24 @@ public class KafkaConsumerService {
         }
     }
 
+    @KafkaListener(topics = "user.events", groupId = "user-service-group")
+    public void consumeUserEvent(String message) {
+        log.info("Received user.event: {}", message);
+        try {
+            JsonNode node = objectMapper.readTree(message);
+            String eventType = node.has("eventType") ? node.get("eventType").asText() : "";
+
+            if ("USER_REGISTERED".equals(eventType)) {
+                UUID userId = UUID.fromString(node.get("userId").asText());
+                String email = node.get("email").asText();
+                String name = node.has("name") ? node.get("name").asText() : "";
+                userService.createUser(userId, email, name);
+            }
+        } catch (Exception e) {
+            log.error("Failed to process user.event", e);
+        }
+    }
+
     @KafkaListener(topics = "sync.events", groupId = "user-service-group")
     public void consumeSyncEvent(String message) {
         log.info("Received sync.event: {}", message);

@@ -194,9 +194,10 @@ public class VersionService {
         for (FileVersion v : versionsToDelete) {
             try {
                 // Warning: deduplication check is needed in real word
-                storageServiceClient.deleteFile(v.getStoragePath());
+                storageServiceClient.deleteFile(v.getFile().getId().toString(), v.getVersion());
             } catch (Exception e) {
-                log.warn("Failed to delete version file from storage: path={}", v.getStoragePath());
+                log.warn("Failed to delete version file from storage: fileId={}, version={}", 
+                        v.getFile().getId(), v.getVersion());
             }
         }
 
@@ -224,9 +225,10 @@ public class VersionService {
             // Clean up storage
             for (FileVersion v : versionsToDelete) {
                 try {
-                    storageServiceClient.deleteFile(v.getStoragePath());
+                    storageServiceClient.deleteFile(v.getFile().getId().toString(), v.getVersion());
                 } catch (Exception e) {
-                    log.warn("Failed to delete version file from storage: path={}", v.getStoragePath());
+                    log.warn("Failed to delete version file from storage: fileId={}, version={}", 
+                            v.getFile().getId(), v.getVersion());
                 }
             }
 
