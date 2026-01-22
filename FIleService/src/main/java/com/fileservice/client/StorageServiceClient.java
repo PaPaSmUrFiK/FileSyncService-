@@ -83,4 +83,19 @@ public class StorageServiceClient {
             throw new RuntimeException("Failed to get download url from storage service", e);
         }
     }
+
+    public void saveVersionMetadata(String fileId, int version, String storagePath, long size) {
+        SaveVersionMetadataRequest request = SaveVersionMetadataRequest.newBuilder()
+                .setFileId(fileId)
+                .setVersion(version)
+                .setStoragePath(storagePath)
+                .setSize(size)
+                .build();
+
+        try {
+            storageServiceStub.saveVersionMetadata(request);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save version metadata to storage service", e);
+        }
+    }
 }

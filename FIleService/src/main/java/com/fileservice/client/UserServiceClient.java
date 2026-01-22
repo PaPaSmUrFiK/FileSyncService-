@@ -29,19 +29,20 @@ public class UserServiceClient {
             log.debug("Checking quota for user {} with file size {}", userId, size);
             QuotaResponse response = userServiceStub.checkQuota(request);
             boolean hasSpace = response.getHasSpace();
-            log.debug("Quota check result for user {}: hasSpace={}, available={}, used={}, total={}", 
-                    userId, hasSpace, response.getAvailableSpace(), response.getStorageUsed(), response.getStorageQuota());
+            log.debug("Quota check result for user {}: hasSpace={}, available={}, used={}, total={}",
+                    userId, hasSpace, response.getAvailableSpace(), response.getStorageUsed(),
+                    response.getStorageQuota());
             return hasSpace;
         } catch (StatusRuntimeException e) {
             Status status = e.getStatus();
             String errorMessage = status.getDescription() != null ? status.getDescription() : status.getCode().name();
             log.error("gRPC error checking quota for user {}: {} - {}", userId, status.getCode(), errorMessage);
-            
+
             // Если ошибка связана с недоступностью сервиса, бросаем понятное исключение
             if (status.getCode() == Status.Code.UNAVAILABLE || status.getCode() == Status.Code.DEADLINE_EXCEEDED) {
                 throw new RuntimeException("User service is unavailable. Please try again later.", e);
             }
-            
+
             // Для остальных ошибок (например, INTERNAL) пробрасываем оригинальное сообщение
             throw new RuntimeException("Failed to check quota: " + errorMessage, e);
         } catch (Exception e) {
@@ -62,6 +63,52 @@ public class UserServiceClient {
             // This ideally should be retried or sent to a DLQ/Kafka if sync call fails.
             // But required is gRPC client.
             throw new RuntimeException("Failed to update storage usage", e);
+        }
+    }
+
+    /**
+     * Get user information (email and name) by user ID
+     * Returns null if user not found
+     */
+    public UserInfo getUserInfo(UUID userId) {
+        com.filesync.user.grpc.GetUserRequest request = com.filesync.user.grpc.GetUserRequest.newBuilder()
+                .setUserId(userId.toString())
+                .build();
+
+        try {
+            com.filesync.user.grpc.UserResponse response = userServiceStub.getUser(request);
+            return new UserInfo(response.getEmail(), response.getName());
+        } catch (StatusRuntimeException e) {
+            if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
+                log.warn("User not found: {}", userId);
+                return null;
+            }
+            log.error("Error getting user info for {}: {}", userId, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.error("Unexpected error getting user info for {}: {}", userId, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Simple DTO for user information
+     */
+    public static class UserInfo {
+        private final String email;
+        private final String name;
+
+        public UserInfo(String email, String name) {
+            this.email = email;
+            this.name = name;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public String getName() {
+            return name;
         }
     }
 }

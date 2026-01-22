@@ -26,6 +26,7 @@ public class GrpcClientConfig {
                 .usePlaintext()
                 .build();
 
-        return AuthServiceGrpc.newBlockingStub(channel);
+        return AuthServiceGrpc.newBlockingStub(channel)
+                .withInterceptors(new com.filesync.userservice.security.AuthHeaderClientInterceptor());
     }
 }

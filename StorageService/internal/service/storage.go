@@ -120,6 +120,31 @@ func (s *StorageService) ConfirmUpload(ctx context.Context, fileID string, versi
 	return s.producer.PublishEvent(ctx, event)
 }
 
+func (s *StorageService) SaveVersionMetadata(ctx context.Context, fileID string, version int32, storagePath string, size int64) error {
+	const op = "service.storage.SaveVersionMetadata"
+
+	uid, err := uuid.Parse(fileID)
+	if err != nil {
+		return fmt.Errorf("%s: неверный ID файла: %w", op, err)
+	}
+
+	// Сохраняем новую версию, но используем путь к данным старой версии
+	// Bucket хардкодим пока, так как он везде "file-sync-storage"
+	v := &domain.StorageVersion{
+		FileID:      uid,
+		Version:     version,
+		StoragePath: storagePath,
+		Bucket:      "file-sync-storage",
+		Size:        size,
+	}
+
+	if err := s.repo.SaveVersion(ctx, v); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 func (s *StorageService) DeleteFile(ctx context.Context, fileID string, version *int32) error {
 	const op = "service.storage.DeleteFile"
 

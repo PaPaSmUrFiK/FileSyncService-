@@ -1,24 +1,35 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { LoginPage } from './pages/LoginPage';
 import { FilesPage } from './pages/FilesPage';
-import { RecentPage } from './pages/RecentPage';
-import { ConflictsPage } from './pages/ConflictsPage';
+import { SharedPage } from './pages/SharedPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { TrashPage } from './pages/TrashPage';
 import { HistoryPage } from './pages/HistoryPage';
-import { DevicesPage } from './pages/DevicesPage';
+import { AdminPage } from './pages/AdminPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { Sidebar } from './components/Sidebar';
-import { Topbar } from './components/Topbar';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const isAdmin = user?.roles?.includes('ADMIN');
+
+  if (!isAdmin) {
+    return <Navigate to="/files" replace />;
+  }
+
+  return <>{children}</>;
+}
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-bg-0 via-bg-1 to-bg-2">
       <Sidebar />
       <div className="ml-[260px]">
-        <Topbar />
-        <main className="min-h-[calc(100vh-5rem)]">
+        <main className="min-h-screen">
           {children}
         </main>
       </div>
@@ -29,6 +40,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
+      <Toaster richColors position="top-right" />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LoginPage />} />
@@ -41,18 +53,26 @@ function App() {
             }
           />
           <Route
-            path="/recent"
+            path="/shared"
             element={
               <ProtectedRoute>
-                <AppLayout><RecentPage /></AppLayout>
+                <AppLayout><SharedPage /></AppLayout>
               </ProtectedRoute>
             }
           />
           <Route
-            path="/conflicts"
+            path="/notifications"
             element={
               <ProtectedRoute>
-                <AppLayout><ConflictsPage /></AppLayout>
+                <AppLayout><NotificationsPage /></AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trash"
+            element={
+              <ProtectedRoute>
+                <AppLayout><TrashPage /></AppLayout>
               </ProtectedRoute>
             }
           />
@@ -65,10 +85,12 @@ function App() {
             }
           />
           <Route
-            path="/devices"
+            path="/admin"
             element={
               <ProtectedRoute>
-                <AppLayout><DevicesPage /></AppLayout>
+                <AdminRoute>
+                  <AppLayout><AdminPage /></AppLayout>
+                </AdminRoute>
               </ProtectedRoute>
             }
           />

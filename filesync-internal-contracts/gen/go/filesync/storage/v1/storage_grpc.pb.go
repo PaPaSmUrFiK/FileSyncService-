@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StorageService_GetUploadUrl_FullMethodName   = "/filesync.storage.v1.StorageService/GetUploadUrl"
-	StorageService_GetDownloadUrl_FullMethodName = "/filesync.storage.v1.StorageService/GetDownloadUrl"
-	StorageService_DeleteFile_FullMethodName     = "/filesync.storage.v1.StorageService/DeleteFile"
-	StorageService_CopyFile_FullMethodName       = "/filesync.storage.v1.StorageService/CopyFile"
-	StorageService_ConfirmUpload_FullMethodName  = "/filesync.storage.v1.StorageService/ConfirmUpload"
+	StorageService_GetUploadUrl_FullMethodName        = "/filesync.storage.v1.StorageService/GetUploadUrl"
+	StorageService_GetDownloadUrl_FullMethodName      = "/filesync.storage.v1.StorageService/GetDownloadUrl"
+	StorageService_DeleteFile_FullMethodName          = "/filesync.storage.v1.StorageService/DeleteFile"
+	StorageService_CopyFile_FullMethodName            = "/filesync.storage.v1.StorageService/CopyFile"
+	StorageService_ConfirmUpload_FullMethodName       = "/filesync.storage.v1.StorageService/ConfirmUpload"
+	StorageService_SaveVersionMetadata_FullMethodName = "/filesync.storage.v1.StorageService/SaveVersionMetadata"
 )
 
 // StorageServiceClient is the client API for StorageService service.
@@ -43,6 +44,8 @@ type StorageServiceClient interface {
 	CopyFile(ctx context.Context, in *CopyFileRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 	// Подтверждение успешной загрузки файла
 	ConfirmUpload(ctx context.Context, in *ConfirmUploadRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
+	// Сохранение метаданных версии (используется при восстановлении версии)
+	SaveVersionMetadata(ctx context.Context, in *SaveVersionMetadataRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 }
 
 type storageServiceClient struct {
@@ -103,6 +106,16 @@ func (c *storageServiceClient) ConfirmUpload(ctx context.Context, in *ConfirmUpl
 	return out, nil
 }
 
+func (c *storageServiceClient) SaveVersionMetadata(ctx context.Context, in *SaveVersionMetadataRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EmptyResponse)
+	err := c.cc.Invoke(ctx, StorageService_SaveVersionMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServiceServer is the server API for StorageService service.
 // All implementations must embed UnimplementedStorageServiceServer
 // for forward compatibility.
@@ -120,6 +133,8 @@ type StorageServiceServer interface {
 	CopyFile(context.Context, *CopyFileRequest) (*EmptyResponse, error)
 	// Подтверждение успешной загрузки файла
 	ConfirmUpload(context.Context, *ConfirmUploadRequest) (*EmptyResponse, error)
+	// Сохранение метаданных версии (используется при восстановлении версии)
+	SaveVersionMetadata(context.Context, *SaveVersionMetadataRequest) (*EmptyResponse, error)
 	mustEmbedUnimplementedStorageServiceServer()
 }
 
@@ -144,6 +159,9 @@ func (UnimplementedStorageServiceServer) CopyFile(context.Context, *CopyFileRequ
 }
 func (UnimplementedStorageServiceServer) ConfirmUpload(context.Context, *ConfirmUploadRequest) (*EmptyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConfirmUpload not implemented")
+}
+func (UnimplementedStorageServiceServer) SaveVersionMetadata(context.Context, *SaveVersionMetadataRequest) (*EmptyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveVersionMetadata not implemented")
 }
 func (UnimplementedStorageServiceServer) mustEmbedUnimplementedStorageServiceServer() {}
 func (UnimplementedStorageServiceServer) testEmbeddedByValue()                        {}
@@ -256,6 +274,24 @@ func _StorageService_ConfirmUpload_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StorageService_SaveVersionMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveVersionMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServiceServer).SaveVersionMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StorageService_SaveVersionMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServiceServer).SaveVersionMetadata(ctx, req.(*SaveVersionMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StorageService_ServiceDesc is the grpc.ServiceDesc for StorageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -282,6 +318,10 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConfirmUpload",
 			Handler:    _StorageService_ConfirmUpload_Handler,
+		},
+		{
+			MethodName: "SaveVersionMetadata",
+			Handler:    _StorageService_SaveVersionMetadata_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

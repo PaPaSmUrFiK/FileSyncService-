@@ -112,16 +112,28 @@ public class NotificationController {
                 });
     }
 
+    @DeleteMapping
+    public Mono<ResponseEntity<Object>> deleteAllNotifications(@RequestHeader("X-User-Id") String userId) {
+        log.info("Delete all notifications request for userId: {}", userId);
+        return notificationServiceClient.deleteAllNotifications(userId)
+                .then(Mono.just(ResponseEntity.noContent().build()))
+                .onErrorResume(e -> {
+                    log.error("Delete all notifications error: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(new com.gatewayservice.model.ErrorResponse(e.getMessage())));
+                });
+    }
+
     @PostMapping("/push-tokens")
     public Mono<ResponseEntity<Object>> registerPushToken(
             @RequestHeader("X-User-Id") String userId,
             @RequestBody Map<String, String> requestBody) {
         log.info("Register push token request for userId: {}", userId);
-        
+
         String deviceId = requestBody.get("deviceId");
         String token = requestBody.get("token");
         String platform = requestBody.get("platform");
-        
+
         return notificationServiceClient.registerPushToken(userId, deviceId, token, platform)
                 .then(Mono.just(ResponseEntity.ok().build()))
                 .onErrorResume(e -> {
@@ -162,7 +174,7 @@ public class NotificationController {
             @RequestHeader("X-User-Id") String userId,
             @RequestBody Map<String, Object> requestBody) {
         log.info("Update preferences request for userId: {}", userId);
-        
+
         Boolean emailEnabled = getBoolean(requestBody, "emailEnabled");
         Boolean pushEnabled = getBoolean(requestBody, "pushEnabled");
         Boolean websocketEnabled = getBoolean(requestBody, "websocketEnabled");
@@ -174,7 +186,7 @@ public class NotificationController {
         Boolean quietHoursEnabled = getBoolean(requestBody, "quietHoursEnabled");
         String quietHoursStart = (String) requestBody.get("quietHoursStart");
         String quietHoursEnd = (String) requestBody.get("quietHoursEnd");
-        
+
         return notificationServiceClient.updatePreferences(userId, emailEnabled, pushEnabled,
                 websocketEnabled, fileNotifications, syncNotifications, shareNotifications,
                 adminNotifications, systemNotifications, quietHoursEnabled, quietHoursStart, quietHoursEnd)
@@ -205,10 +217,12 @@ public class NotificationController {
 
     private Boolean getBoolean(Map<String, Object> map, String key) {
         Object value = map.get(key);
-        if (value == null) return null;
-        if (value instanceof Boolean) return (Boolean) value;
-        if (value instanceof String) return Boolean.parseBoolean((String) value);
+        if (value == null)
+            return null;
+        if (value instanceof Boolean)
+            return (Boolean) value;
+        if (value instanceof String)
+            return Boolean.parseBoolean((String) value);
         return null;
     }
 }
-

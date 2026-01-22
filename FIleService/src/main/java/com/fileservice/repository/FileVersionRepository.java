@@ -1,6 +1,5 @@
 package com.fileservice.repository;
 
-
 import com.fileservice.model.FileVersion;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,26 +15,26 @@ import java.util.UUID;
 @Repository
 public interface FileVersionRepository extends JpaRepository<FileVersion, UUID> {
 
-    List<FileVersion> findByFileIdOrderByVersionDesc(UUID fileId);
+        List<FileVersion> findByFileIdOrderByVersionDesc(UUID fileId);
 
-    Page<FileVersion> findByFileIdOrderByVersionDesc(UUID fileId, Pageable pageable);
+        Page<FileVersion> findByFileIdOrderByVersionDesc(UUID fileId, Pageable pageable);
 
-    Optional<FileVersion> findByFileIdAndVersion(UUID fileId, Integer version);
+        Optional<FileVersion> findByFileIdAndVersion(UUID fileId, Integer version);
 
-    @Query(value = "SELECT * FROM file_versions WHERE file_id = :fileId " +
-            "ORDER BY version DESC LIMIT 1", nativeQuery = true)
-    Optional<FileVersion> findLatestVersion(@Param("fileId") UUID fileId);
+        @Query(value = "SELECT * FROM file_versions WHERE file_id = :fileId " +
+                        "ORDER BY version DESC LIMIT 1", nativeQuery = true)
+        Optional<FileVersion> findLatestVersion(@Param("fileId") UUID fileId);
 
-    long countByFileId(UUID fileId);
+        long countByFileId(UUID fileId);
 
-    List<FileVersion> findByFileIdAndCreatedBy(UUID fileId, UUID createdBy);
+        List<FileVersion> findByFileIdAndCreatedByUserId(UUID fileId, UUID createdByUserId);
 
-    @Query("SELECT COALESCE(SUM(fv.size), 0) FROM FileVersion fv WHERE fv.file.id = :fileId")
-    Long calculateTotalVersionsSize(@Param("fileId") UUID fileId);
+        @Query("SELECT COALESCE(SUM(fv.size), 0) FROM FileVersion fv WHERE fv.file.id = :fileId")
+        Long calculateTotalVersionsSize(@Param("fileId") UUID fileId);
 
-    List<FileVersion> findByHash(String hash);
+        List<FileVersion> findByHash(String hash);
 
-    @Query("SELECT fv FROM FileVersion fv WHERE fv.file.id = :fileId " +
-            "ORDER BY fv.version DESC")
-    List<FileVersion> findAllVersionsSorted(@Param("fileId") UUID fileId);
+        @Query("SELECT fv FROM FileVersion fv WHERE fv.file.id = :fileId " +
+                        "ORDER BY fv.version DESC")
+        List<FileVersion> findAllVersionsSorted(@Param("fileId") UUID fileId);
 }

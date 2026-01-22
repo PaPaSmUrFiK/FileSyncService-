@@ -11,12 +11,9 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(
-        name = "users",
-        indexes = {
-                @Index(name = "idx_users_email", columnList = "email")
-        }
-)
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_email", columnList = "email")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -60,22 +57,22 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    /* =========================
-       Relationships
-       ========================= */
+    /*
+     * =========================
+     * Relationships
+     * =========================
+     */
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "user_roles",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
+    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
-    /* =========================
-       Lifecycle callbacks
-       ========================= */
+    /*
+     * =========================
+     * Lifecycle callbacks
+     * =========================
+     */
 
     @PrePersist
     protected void onCreate() {

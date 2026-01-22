@@ -7,6 +7,7 @@ import com.notificationservice.repository.NotificationRepository;
 import com.notificationservice.service.DeliveryService;
 import com.notificationservice.service.NotificationService;
 import io.r2dbc.postgresql.codec.Json;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -28,10 +29,12 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final DeliveryService deliveryService;
+    private final com.notificationservice.service.WebSocketService webSocketService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public Mono<Void> sendNotification(UUID userId, String type, String title, String message, String priority,
-            Map<String, String> data, List<String> channels) {
+            UUID resourceId, String resourceType, Map<String, String> data, List<String> channels) {
 
         Notification notification = Notification.builder()
                 .userId(userId)
@@ -39,6 +42,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(title)
                 .message(message)
                 .priority(priority)
+                .resourceId(resourceId)
+                .resourceType(resourceType)
                 .data(data != null ? Json.of(serializeMap(data)) : null)
                 .read(false)
                 .createdAt(LocalDateTime.now())
@@ -51,6 +56,11 @@ public class NotificationServiceImpl implements NotificationService {
                     log.error("Failed to process notification for user {}: {}", userId, e.getMessage());
                     return Mono.empty();
                 });
+    }
+
+    @Override
+    public Mono<Boolean> exists(UUID userId, UUID resourceId, String type) {
+        return notificationRepository.existsByUserIdAndResourceIdAndNotificationType(userId, resourceId, type);
     }
 
     @Override
@@ -73,17 +83,26 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public Mono<Void> markAsRead(UUID notificationId, UUID userId) {
-        return notificationRepository.markAsRead(notificationId, userId);
+        return notificationRepository.markAsRead(notificationId, userId)
+                .then(webSocketService.sendReadConfirmation(userId, notificationId));
     }
 
     @Override
     public Mono<Void> markAllAsRead(UUID userId) {
-        return notificationRepository.markAllAsReadForUser(userId);
+        return notificationRepository.markAllAsReadForUser(userId)
+                .then(webSocketService.sendAllReadConfirmation(userId, 0)); // Count opt-in
     }
 
     @Override
     public Mono<Void> deleteNotification(UUID notificationId, UUID userId) {
-        return notificationRepository.deleteByIdAndUserId(notificationId, userId);
+        return notificationRepository.deleteByIdAndUserId(notificationId, userId)
+                .then(webSocketService.sendDeleteConfirmation(userId, notificationId));
+    }
+
+    @Override
+    public Mono<Void> deleteAllNotifications(UUID userId) {
+        return notificationRepository.deleteAllByUserId(userId)
+                .then(webSocketService.sendAllDeleteConfirmation(userId));
     }
 
     @Override
@@ -132,12 +151,11 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     private String serializeMap(Map<String, String> data) {
-        // Simple serialization or use a real JSON library
-        StringBuilder sb = new StringBuilder("{");
-        data.forEach((k, v) -> sb.append("\"").append(k).append("\":\"").append(v).append("\","));
-        if (sb.length() > 1)
-            sb.setLength(sb.length() - 1);
-        sb.append("}");
-        return sb.toString();
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            log.error("Failed to serialize notification data", e);
+            return "{}";
+        }
     }
 }

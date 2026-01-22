@@ -11,7 +11,9 @@ import java.util.UUID;
 
 public interface NotificationService {
     Mono<Void> sendNotification(UUID userId, String type, String title, String message, String priority,
-            Map<String, String> data, List<String> channels);
+            UUID resourceId, String resourceType, Map<String, String> data, List<String> channels);
+
+    Mono<Boolean> exists(UUID userId, UUID resourceId, String type);
 
     Flux<Notification> getNotifications(UUID userId, boolean unreadOnly, String type, int limit, int offset);
 
@@ -22,6 +24,8 @@ public interface NotificationService {
     Mono<Void> markAllAsRead(UUID userId);
 
     Mono<Void> deleteNotification(UUID notificationId, UUID userId);
+
+    Mono<Void> deleteAllNotifications(UUID userId);
 
     Mono<NotificationPreference> getPreferences(UUID userId);
 

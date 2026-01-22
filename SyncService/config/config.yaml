@@ -6,8 +6,7 @@ grpc:
 http:
   port: 8084
 
-postgres:
-  url: "postgres://postgres:secret@localhost:5432/postgres?sslmode=disable"
+jwt_secret: "q9hFqkz+KQx9nM2yC3g2zKcXrKxF3K0M+Zp+uF4ZxN8="
 
 kafka:
   brokers:
@@ -15,5 +14,4 @@ kafka:
   consumer_group: "sync-service"
   topics:
     file_events: "file.events"
-    storage_events: "storage.events"
-    sync_events: "sync.events"
+    sync_notifications: "sync-notifications"

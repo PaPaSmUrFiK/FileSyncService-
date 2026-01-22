@@ -12,8 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,7 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     public Mono<Void> deliver(Notification notification, List<String> requestedChannels) {
         return preferenceRepository.findByUserId(notification.getUserId())
+                .defaultIfEmpty(getDefaultPreferences(notification.getUserId()))
                 .flatMap(preference -> {
                     Mono<Void> deliveryChain = Mono.empty();
 
@@ -75,8 +78,8 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         // Check if type of notification is enabled for user
         boolean typeEnabled = switch (notification.getNotificationType()) {
-            case "FILE_UPLOADED", "FILE_DELETED" -> preference.isFileNotifications();
-            case "FILE_SHARED" -> preference.isShareNotifications();
+            case "FILE_UPLOADED", "FILE_DELETED", "FILE_PERMANENTLY_DELETED" -> preference.isFileNotifications();
+            case "FILE_SHARED", "FILE_UNSHARED" -> preference.isShareNotifications();
             case "SYNC_COMPLETED", "SYNC_FAILED", "CONFLICT_DETECTED" -> preference.isSyncNotifications();
             case "USER_BLOCKED", "USER_UNBLOCKED", "QUOTA_CHANGED", "PLAN_CHANGED", "ROLE_ASSIGNED", "ROLE_REVOKED" ->
                 preference.isAdminNotifications();
@@ -124,5 +127,21 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     public boolean isDeliveryAllowed(Notification notification, NotificationPreference preference, String channel) {
         return shouldDeliver(notification, preference, channel, null);
+    }
+
+    private NotificationPreference getDefaultPreferences(UUID userId) {
+        return NotificationPreference.builder()
+                .userId(userId)
+                .emailEnabled(true)
+                .pushEnabled(true)
+                .websocketEnabled(true)
+                .fileNotifications(true)
+                .syncNotifications(true)
+                .shareNotifications(true)
+                .adminNotifications(true)
+                .systemNotifications(true)
+                .quietHoursEnabled(false)
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 }

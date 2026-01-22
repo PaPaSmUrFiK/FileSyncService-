@@ -5,12 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Entity
-@Table(
-        name = "roles",
-        uniqueConstraints = {
+@Table(name = "roles", uniqueConstraints = {
                 @UniqueConstraint(name = "uk_roles_name", columnNames = "name")
-        }
-)
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,11 +15,11 @@ import lombok.*;
 @Builder
 public class Role {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Integer id;
 
-    @NotBlank
-    @Column(nullable = false, length = 50)
-    private String name;
+        @NotBlank
+        @Column(nullable = false, length = 50)
+        private String name;
 }

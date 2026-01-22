@@ -12,8 +12,8 @@ import java.util.UUID;
 @GrpcGlobalServerInterceptor
 public class JwtGrpcInterceptor implements ServerInterceptor {
 
-    private static final Metadata.Key<String> AUTHORIZATION_KEY =
-            Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER);
+    private static final Metadata.Key<String> AUTHORIZATION_KEY = Metadata.Key.of("authorization",
+            Metadata.ASCII_STRING_MARSHALLER);
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -32,7 +32,8 @@ public class JwtGrpcInterceptor implements ServerInterceptor {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             call.close(Status.UNAUTHENTICATED.withDescription("Missing Authorization header"), headers);
-            return new ServerCall.Listener<>() {};
+            return new ServerCall.Listener<>() {
+            };
         }
 
         String token = authHeader.substring(7);
@@ -51,8 +52,10 @@ public class JwtGrpcInterceptor implements ServerInterceptor {
 
         } catch (Exception ex) {
             call.close(Status.UNAUTHENTICATED.withDescription("Invalid JWT"), headers);
-            return new ServerCall.Listener<>() {};
+            return new ServerCall.Listener<>() {
+            };
         }
+
     }
 
     private boolean isPublicMethod(String fullMethodName) {
@@ -60,6 +63,12 @@ public class JwtGrpcInterceptor implements ServerInterceptor {
                 || fullMethodName.endsWith("Login")
                 || fullMethodName.endsWith("RefreshToken")
                 || fullMethodName.endsWith("ValidateToken")
-                || fullMethodName.endsWith("Logout");  // Logout не требует токен, использует refreshToken
+                || fullMethodName.endsWith("Logout")
+                || fullMethodName.endsWith("DeleteUser")
+                || fullMethodName.endsWith("BlockUser")
+                || fullMethodName.endsWith("UnblockUser")
+                || fullMethodName.endsWith("GetUserRoles")
+                || fullMethodName.endsWith("AssignRole")
+                || fullMethodName.endsWith("RevokeRole");
     }
 }

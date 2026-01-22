@@ -1,6 +1,5 @@
 package com.authservice.service;
 
-
 import com.authservice.service.dto.TokenPairDto;
 
 import java.util.Set;
@@ -25,4 +24,22 @@ public interface AuthService {
     void revokeRole(UUID userId, String roleName);
 
     Set<String> getUserRoles(UUID userId);
+
+    // User blocking
+    void blockUser(UUID userId, String reason);
+
+    void unblockUser(UUID userId);
+
+    // Statistics
+    int getActiveUsersCount(long fromTimestamp, long toTimestamp);
+
+    java.util.List<String> getUsersActiveInLastMinutes(int minutes);
+
+    int getAdminCount();
+
+    int getBlockedUsersCount();
+
+    void deleteUser(UUID userId);
+
+    void changePassword(UUID userId, String oldPassword, String newPassword);
 }

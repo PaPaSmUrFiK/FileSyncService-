@@ -97,7 +97,7 @@ public class FileServiceClient {
     }
 
     public Mono<com.fileservice.grpc.FileListResponse> listFiles(String userId, String path,
-            String parentFolderId, int limit, int offset) {
+            String parentFolderId, String search, int limit, int offset) {
         return Mono.fromCallable((Callable<com.fileservice.grpc.FileListResponse>) () -> {
             try {
                 com.fileservice.grpc.ListFilesRequest.Builder builder = com.fileservice.grpc.ListFilesRequest
@@ -109,9 +109,58 @@ public class FileServiceClient {
                     builder.setPath(path);
                 if (parentFolderId != null)
                     builder.setParentFolderId(parentFolderId);
+                if (search != null && !search.isEmpty())
+                    builder.setSearchQuery(search);
                 return fileServiceStub.listFiles(builder.build());
             } catch (Exception e) {
                 log.error("Error listing files via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<com.fileservice.grpc.FileListResponse> listTrash(String userId, int limit, int offset) {
+        return Mono.fromCallable((Callable<com.fileservice.grpc.FileListResponse>) () -> {
+            try {
+                com.fileservice.grpc.ListTrashRequest request = com.fileservice.grpc.ListTrashRequest.newBuilder()
+                        .setUserId(userId)
+                        .setLimit(limit)
+                        .setOffset(offset)
+                        .build();
+                return fileServiceStub.listTrash(request);
+            } catch (Exception e) {
+                log.error("Error listing trash via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<Void> restoreFile(String fileId, String userId) {
+        return Mono.fromCallable((Callable<Void>) () -> {
+            try {
+                com.fileservice.grpc.RestoreFileRequest request = com.fileservice.grpc.RestoreFileRequest.newBuilder()
+                        .setFileId(fileId)
+                        .setUserId(userId)
+                        .build();
+                fileServiceStub.restoreFile(request);
+                return null;
+            } catch (Exception e) {
+                log.error("Error restoring file via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<Void> emptyTrash(String userId) {
+        return Mono.fromCallable((Callable<Void>) () -> {
+            try {
+                com.fileservice.grpc.EmptyTrashRequest request = com.fileservice.grpc.EmptyTrashRequest.newBuilder()
+                        .setUserId(userId)
+                        .build();
+                fileServiceStub.emptyTrash(request);
+                return null;
+            } catch (Exception e) {
+                log.error("Error emptying trash via gRPC: {}", e.getMessage(), e);
                 throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
             }
         });
@@ -196,6 +245,86 @@ public class FileServiceClient {
                 return fileServiceStub.moveFile(request);
             } catch (Exception e) {
                 log.error("Error moving file via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<com.fileservice.grpc.FileListResponse> listSharedWithMe(String userId) {
+        return Mono.fromCallable((Callable<com.fileservice.grpc.FileListResponse>) () -> {
+            try {
+                com.fileservice.grpc.ListSharedWithMeRequest request = com.fileservice.grpc.ListSharedWithMeRequest
+                        .newBuilder()
+                        .setUserId(userId)
+                        .build();
+                return fileServiceStub.listSharedWithMe(request);
+            } catch (Exception e) {
+                log.error("Error listing shared with me files via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<com.fileservice.grpc.ShareListResponse> listMyShares(String ownerId, String fileId) {
+        return Mono.fromCallable((Callable<com.fileservice.grpc.ShareListResponse>) () -> {
+            try {
+                com.fileservice.grpc.ListMySharesRequest request = com.fileservice.grpc.ListMySharesRequest.newBuilder()
+                        .setOwnerId(ownerId)
+                        .setFileId(fileId)
+                        .build();
+                return fileServiceStub.listMyShares(request);
+            } catch (Exception e) {
+                log.error("Error listing my shares via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<Void> revokeShare(String shareId, String ownerId) {
+        return Mono.fromCallable((Callable<Void>) () -> {
+            try {
+                com.fileservice.grpc.RevokeShareRequest request = com.fileservice.grpc.RevokeShareRequest.newBuilder()
+                        .setShareId(shareId)
+                        .setOwnerId(ownerId)
+                        .build();
+                fileServiceStub.revokeShare(request);
+                return null;
+            } catch (Exception e) {
+                log.error("Error revoking share via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<com.fileservice.grpc.FileAccessContextResponse> getFileAccessContext(String fileId, String userId) {
+        return Mono.fromCallable((Callable<com.fileservice.grpc.FileAccessContextResponse>) () -> {
+            try {
+                com.fileservice.grpc.GetFileAccessContextRequest request = com.fileservice.grpc.GetFileAccessContextRequest
+                        .newBuilder()
+                        .setFileId(fileId)
+                        .setUserId(userId)
+                        .build();
+                return fileServiceStub.getFileAccessContext(request);
+            } catch (Exception e) {
+                log.error("Error getting file access context via gRPC: {}", e.getMessage(), e);
+                throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<com.fileservice.grpc.FileVersion> addFileVersion(String fileId, String userId, long size, String hash) {
+        return Mono.fromCallable((Callable<com.fileservice.grpc.FileVersion>) () -> {
+            try {
+                com.fileservice.grpc.AddFileVersionRequest request = com.fileservice.grpc.AddFileVersionRequest
+                        .newBuilder()
+                        .setFileId(fileId)
+                        .setUserId(userId)
+                        .setSize(size)
+                        .setHash(hash != null ? hash : "")
+                        .build();
+                return fileServiceStub.addFileVersion(request);
+            } catch (Exception e) {
+                log.error("Error adding file version via gRPC: {}", e.getMessage(), e);
                 throw new RuntimeException("File service unavailable: " + e.getMessage(), e);
             }
         });

@@ -71,8 +71,11 @@ public class AuthServiceClient {
                 return mapToTokenResponse(grpcResponse);
             } catch (io.grpc.StatusRuntimeException e) {
                 log.error("gRPC error during login: {} - {}", e.getStatus().getCode(), e.getStatus().getDescription());
-                throw new RuntimeException(e.getStatus().getDescription() != null ? e.getStatus().getDescription()
-                        : "Authentication failed");
+                String description = e.getStatus().getDescription() != null ? e.getStatus().getDescription()
+                        : "Authentication failed";
+                // Include status code in message so frontend can detect it (e.g.
+                // PERMISSION_DENIED)
+                throw new RuntimeException(e.getStatus().getCode() + " - " + description);
             } catch (Exception e) {
                 log.error("Unexpected error during login: {}", e.getMessage(), e);
                 throw new RuntimeException("Auth service error");
@@ -162,6 +165,36 @@ public class AuthServiceClient {
             } catch (Exception e) {
                 log.error("Error during logout all via gRPC: {}", e.getMessage(), e);
                 throw new RuntimeException("Auth service unavailable: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    public Mono<Void> changePassword(String token, String userId, String oldPassword, String newPassword) {
+        return Mono.fromCallable((Callable<Void>) () -> {
+            try {
+                com.authservice.grpc.ChangePasswordRequest grpcRequest = com.authservice.grpc.ChangePasswordRequest
+                        .newBuilder()
+                        .setUserId(userId)
+                        .setOldPassword(oldPassword)
+                        .setNewPassword(newPassword)
+                        .build();
+
+                io.grpc.Metadata metadata = new io.grpc.Metadata();
+                metadata.put(io.grpc.Metadata.Key.of("authorization", io.grpc.Metadata.ASCII_STRING_MARSHALLER), token);
+
+                io.grpc.ClientInterceptor interceptor = io.grpc.stub.MetadataUtils
+                        .newAttachHeadersInterceptor(metadata);
+                AuthServiceGrpc.AuthServiceBlockingStub stubWithHeaders = authServiceStub.withInterceptors(interceptor);
+                stubWithHeaders.changePassword(grpcRequest);
+                return null;
+            } catch (io.grpc.StatusRuntimeException e) {
+                log.error("gRPC error changing password: {} - {}", e.getStatus().getCode(),
+                        e.getStatus().getDescription());
+                throw new RuntimeException(e.getStatus().getDescription() != null ? e.getStatus().getDescription()
+                        : "Password change failed");
+            } catch (Exception e) {
+                log.error("Unexpected error changing password: {}", e.getMessage(), e);
+                throw new RuntimeException("Auth service error");
             }
         });
     }

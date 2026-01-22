@@ -144,6 +144,11 @@ spring:
 # Используем префикс static:// чтобы принудительно использовать прямые адреса вместо service discovery
 grpc:
   client:
+    # Global defaults for all clients
+    GLOBAL:
+      negotiationType: PLAINTEXT
+      maxInboundMessageSize: 10485760  # 10MB
+      deadline: 10s  # Default 10s timeout for all requests
     auth-service:
       address: static://${AUTH_SERVICE_HOST:auth-service}:${AUTH_SERVICE_PORT:9091}
       negotiationType: PLAINTEXT
@@ -153,12 +158,16 @@ grpc:
     file-service:
       address: static://${FILE_SERVICE_HOST:file-service}:${FILE_SERVICE_PORT:9093}
       negotiationType: PLAINTEXT
+      deadline: 30s  # File operations may take longer
     storage-service:
       address: static://${STORAGE_SERVICE_HOST:storage-service}:${STORAGE_SERVICE_PORT:9094}
       negotiationType: PLAINTEXT
+      deadline: 60s  # Storage operations (upload/download) may take longer
     sync-service:
       address: static://${SYNC_SERVICE_HOST:sync-service}:${SYNC_SERVICE_PORT:9095}
       negotiationType: PLAINTEXT
     notification-service:
       address: static://${NOTIFICATION_SERVICE_HOST:notification-service}:${NOTIFICATION_SERVICE_PORT:9096}
       negotiationType: PLAINTEXT
+      deadline: 5s  # Notifications should be fast
+      enableKeepAlive: false  # Disable keepalive to prevent "too_many_pings" errors

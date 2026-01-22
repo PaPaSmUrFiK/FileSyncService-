@@ -9,9 +9,11 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthServiceClient {
 
     private final AuthServiceGrpc.AuthServiceBlockingStub authServiceBlockingStub;
@@ -31,10 +33,23 @@ public class AuthServiceClient {
     }
 
     public List<String> getUserRoles(UUID userId) {
-        UserRolesResponse response = authServiceBlockingStub.getUserRoles(GetUserRolesRequest.newBuilder()
-                .setUserId(userId.toString())
-                .build());
-        return response.getRolesList();
+        try {
+            log.debug("Calling AuthService.getUserRoles for user: {}", userId);
+            UserRolesResponse response = authServiceBlockingStub.getUserRoles(GetUserRolesRequest.newBuilder()
+                    .setUserId(userId.toString())
+                    .build());
+            log.debug("AuthService returned {} roles for user {}: {}",
+                    response.getRolesCount(), userId, response.getRolesList());
+            return response.getRolesList();
+        } catch (io.grpc.StatusRuntimeException e) {
+            log.error("gRPC error calling getUserRoles for user {}: {} - {}",
+                    userId, e.getStatus(), e.getMessage());
+            throw new RuntimeException("Failed to get user roles from AuthService: " + e.getStatus().getDescription(),
+                    e);
+        } catch (Exception e) {
+            log.error("Unexpected error calling getUserRoles for user {}: {}", userId, e.getMessage(), e);
+            throw new RuntimeException("Failed to get user roles from AuthService", e);
+        }
     }
 
     public int getActiveUsersCount(LocalDateTime from, LocalDateTime to) {
@@ -68,14 +83,46 @@ public class AuthServiceClient {
     }
 
     public void blockUser(UUID userId, String reason) {
-        // TODO: AuthService might need a specific BlockUser method if strictly defined,
-        // but typically blocking might be a role change or a specific flag update.
-        // The prompt says "delegates to AuthService" for "BlockUser".
-        // BUT auth.proto DOES NOT HAVE BlockUser!!!
-        // It has RevokeRole.
-        // I will assume for now we just log it or throw Unsupported.
-        // Actually, looking at prompt again: "rpc BlockUser... delegatates to
-        // AuthService"
-        // I should probably add BlockUser to auth.proto too if I want it to work.
+        try {
+            authServiceBlockingStub.blockUser(BlockUserRequest.newBuilder()
+                    .setUserId(userId.toString())
+                    .setReason(reason)
+                    .build());
+        } catch (io.grpc.StatusRuntimeException e) {
+            throw new RuntimeException("Failed to block user in AuthService: " + e.getStatus().getDescription(), e);
+        }
+    }
+
+    public void unblockUser(UUID userId) {
+        authServiceBlockingStub.unblockUser(UnblockUserRequest.newBuilder()
+                .setUserId(userId.toString())
+                .build());
+    }
+
+    public void deleteUser(UUID userId) {
+        authServiceBlockingStub.deleteUser(DeleteUserRequest.newBuilder()
+                .setUserId(userId.toString())
+                .build());
+    }
+
+    public int getAdminCount() {
+        try {
+            CountResponse response = authServiceBlockingStub.getAdminCount(GetAdminCountRequest.newBuilder().build());
+            return response.getCount();
+        } catch (Exception e) {
+            log.warn("Failed to get admin count from AuthService, defaulting to 1. Error: {}", e.getMessage());
+            return 1;
+        }
+    }
+
+    public int getBlockedUsersCount() {
+        try {
+            CountResponse response = authServiceBlockingStub
+                    .getBlockedUsersCount(GetBlockedUsersCountRequest.newBuilder().build());
+            return response.getCount();
+        } catch (Exception e) {
+            log.warn("Failed to get blocked users count from AuthService, defaulting to 0. Error: {}", e.getMessage());
+            return 0;
+        }
     }
 }

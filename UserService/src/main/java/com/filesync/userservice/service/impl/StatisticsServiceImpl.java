@@ -64,10 +64,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     public Map<String, Object> getStorageStatistics() {
         Map<String, Object> stats = new HashMap<>();
 
-        stats.put("total_storage_used", userRepository.getTotalStorageUsed());
-        stats.put("total_storage_allocated", userRepository.getTotalStorageAllocated());
-        stats.put("storage_by_plan", userQuotaRepository.getStorageStatsByPlan());
-        stats.put("top_users",
+        Long usedRaw = userRepository.getTotalStorageUsed();
+        Long allocatedRaw = userRepository.getTotalStorageAllocated();
+
+        stats.put("totalBytesUsed", usedRaw != null ? usedRaw : 0L);
+        stats.put("totalBytesAllocated", allocatedRaw != null ? allocatedRaw : 0L);
+        stats.put("storageByPlan", userQuotaRepository.getStorageStatsByPlan());
+        stats.put("topUsers",
                 userRepository.findTopUsersByStorage(org.springframework.data.domain.PageRequest.of(0, 10)));
 
         return stats;
@@ -77,11 +80,22 @@ public class StatisticsServiceImpl implements StatisticsService {
     public Map<String, Object> getUserStatistics() {
         Map<String, Object> stats = new HashMap<>();
 
-        stats.put("total_users", (int) userRepository.count());
-        // TODO: Break down by plan (free, premium, etc) using repository queries
+        long totalUsers = userRepository.count();
+        stats.put("totalUsers", (int) totalUsers);
 
-        LocalDateTime fromDate = LocalDateTime.now().minusMonths(6); // Example
-        stats.put("users_by_date", userRepository.getRegistrationDynamics(fromDate));
+        LocalDateTime now = LocalDateTime.now();
+        stats.put("newUsersLast24h", (int) userRepository.countUsersRegisteredBetween(now.minusHours(24), now));
+        stats.put("activeUsersLastHour", authServiceClient.getActiveUsersCount(now.minusHours(1), now));
+
+        // Get blocked users count from AuthService (source of truth)
+        stats.put("blockedUsers", authServiceClient.getBlockedUsersCount());
+
+        // Count admins by checking roles from AuthService
+        int adminCount = authServiceClient.getAdminCount();
+        stats.put("adminCount", adminCount);
+
+        LocalDateTime fromDate = LocalDateTime.now().minusMonths(6);
+        stats.put("usersByDate", userRepository.getRegistrationDynamics(fromDate));
 
         return stats;
     }

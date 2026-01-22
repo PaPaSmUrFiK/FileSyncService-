@@ -37,8 +37,8 @@ public class PermissionService {
                 fileId, userId, requiredPermission);
 
         // Проверка существования файла
-        Optional<File> fileOpt = fileRepository.findById(fileId)
-                .filter(f -> !f.isDeleted());
+        // Проверка существования файла
+        Optional<File> fileOpt = fileRepository.findById(fileId);
 
         if (fileOpt.isEmpty()) {
             return false;
@@ -115,8 +115,8 @@ public class PermissionService {
         log.debug("Getting user permission: fileId={}, userId={}", fileId, userId);
 
         // Проверка существования файла
-        Optional<File> fileOpt = fileRepository.findById(fileId)
-                .filter(f -> !f.isDeleted());
+        // Проверка существования файла
+        Optional<File> fileOpt = fileRepository.findById(fileId);
 
         if (fileOpt.isEmpty()) {
             return Optional.empty();
@@ -162,7 +162,6 @@ public class PermissionService {
      */
     public boolean isOwner(UUID fileId, UUID userId) {
         return fileRepository.findByIdAndUserId(fileId, userId)
-                .filter(f -> !f.isDeleted())
                 .isPresent();
     }
 

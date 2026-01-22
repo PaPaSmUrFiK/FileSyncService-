@@ -45,10 +45,24 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - Server took too long to respond');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       // Если 401 и есть refresh token, попробуем обновить токен
@@ -173,6 +187,13 @@ class ApiService {
     });
   }
 
+  async changePassword(data: { oldPassword: string; newPassword: string }): Promise<void> {
+    return this.request<void>('/api/v1/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   /* =========================
      FILE & FOLDER ENDPOINTS
      ========================= */
@@ -180,12 +201,14 @@ class ApiService {
   async listFiles(params: {
     path?: string;
     parentFolderId?: string;
+    search?: string;
     limit?: number;
     offset?: number;
   }): Promise<{ files: any[]; total: number }> {
     const query = new URLSearchParams();
     if (params.path) query.append('path', params.path);
     if (params.parentFolderId) query.append('parentFolderId', params.parentFolderId);
+    if (params.search) query.append('search', params.search);
     if (params.limit) query.append('limit', params.limit.toString());
     if (params.offset) query.append('offset', params.offset.toString());
 
@@ -228,11 +251,46 @@ class ApiService {
     });
   }
 
+  async listTrash(limit: number = 50, offset: number = 0): Promise<{ files: any[]; total: number }> {
+    return this.request<{ files: any[]; total: number }>(`/api/v1/files/trash?limit=${limit}&offset=${offset}`);
+  }
+
+  async restoreFile(fileId: string): Promise<void> {
+    return this.request<void>(`/api/v1/files/${fileId}/restore`, {
+      method: 'POST',
+    });
+  }
+
+  async emptyTrash(): Promise<void> {
+    return this.request<void>('/api/v1/files/trash/empty', {
+      method: 'DELETE',
+    });
+  }
+
   async shareFile(fileId: string, sharedWithUserId: string, permission: 'read' | 'write' = 'read'): Promise<any> {
     return this.request<any>(`/api/v1/files/${fileId}/share`, {
       method: 'POST',
       body: JSON.stringify({ sharedWithUserId, permission }),
     });
+  }
+
+  async listSharedWithMe(limit: number = 50, offset: number = 0): Promise<{ shares: any[]; total: number }> {
+    return this.request<{ shares: any[]; total: number }>(`/api/v1/files/shared-with-me?limit=${limit}&offset=${offset}`);
+  }
+
+  async listMyShares(fileId?: string): Promise<{ shares: any[]; total: number }> {
+    const query = fileId ? `?fileId=${fileId}` : '';
+    return this.request<{ shares: any[]; total: number }>(`/api/v1/files/my-shares${query}`);
+  }
+
+  async revokeShare(shareId: string): Promise<void> {
+    return this.request<void>(`/api/v1/files/shares/${shareId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getFileAccessContext(fileId: string): Promise<any> {
+    return this.request<any>(`/api/v1/files/${fileId}/access-context`);
   }
 
   async getFileVersions(fileId: string): Promise<{ versions: any[] }> {
@@ -423,6 +481,12 @@ class ApiService {
     });
   }
 
+  async deleteAllNotifications(): Promise<void> {
+    return this.request<void>('/api/v1/notifications', {
+      method: 'DELETE',
+    });
+  }
+
   async registerPushToken(data: {
     deviceId: string;
     token: string;
@@ -571,6 +635,12 @@ class ApiService {
 
   async adminGetActiveUsers(minutes: number = 60): Promise<any> {
     return this.request<any>(`/api/v1/admin/statistics/active?minutes=${minutes}`);
+  }
+
+  async adminDeleteUser(userId: string): Promise<void> {
+    return this.request<void>(`/api/v1/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

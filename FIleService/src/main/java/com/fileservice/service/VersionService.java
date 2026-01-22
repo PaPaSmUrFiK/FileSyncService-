@@ -59,7 +59,7 @@ public class VersionService {
         }
 
         version.setFile(file);
-        version.setCreatedBy(userId);
+        version.setCreatedByUserId(userId);
 
         FileVersion savedVersion = versionRepository.save(version);
 
@@ -130,27 +130,43 @@ public class VersionService {
             throw new IllegalArgumentException("File not found or deleted");
         }
 
-        // Получаем текущую версию файла
-        int newVersionNumber = file.getVersion() + 1;
-
-        // Создаем новую версию на основе старой
-        FileVersion newVersion = FileVersion.builder()
+        // 1. Archive CURRENT version (e.g. v2) before overwriting it
+        // We need to save the state that is about to be lost (the current state of the
+        // 'file' entity)
+        FileVersion currentVersionArchive = FileVersion.builder()
                 .file(file)
-                .version(newVersionNumber)
-                .size(oldVersion.getSize())
-                .hash(oldVersion.getHash())
-                .storagePath(oldVersion.getStoragePath())
-                .createdBy(userId)
+                .version(file.getVersion())
+                .size(file.getSize())
+                .hash(file.getHash())
+                .storagePath(file.getStoragePath())
+                // Attribute the archiving to the user performing the restore,
+                // or ideally the original creator if we knew.
+                // Using file owner or current user is acceptable.
+                .createdByUserId(userId)
                 .build();
 
-        FileVersion savedVersion = versionRepository.save(newVersion);
+        versionRepository.save(currentVersionArchive);
 
-        // Обновляем файл
+        // 2. Prepare new version number
+        // The file is moving forward to a new version (v3), which happens to look like
+        // v1.
+        int newVersionNumber = file.getVersion() + 1;
+
+        // 3. Update File to match the OLD version (content-wise) but with NEW version
+        // number
         file.setVersion(newVersionNumber);
         file.setSize(oldVersion.getSize());
         file.setHash(oldVersion.getHash());
         file.setStoragePath(oldVersion.getStoragePath());
         fileRepository.save(file);
+
+        // Synchronously register the new version metadata in StorageService to prevent
+        // race conditions during download
+        storageServiceClient.saveVersionMetadata(
+                fileId.toString(),
+                newVersionNumber,
+                oldVersion.getStoragePath(),
+                oldVersion.getSize());
 
         log.info("Version restored: oldVersion={}, newVersion={}, fileId={}",
                 versionNumber, newVersionNumber, fileId);
@@ -162,10 +178,19 @@ public class VersionService {
                 .userId(userId)
                 .timestamp(LocalDateTime.now())
                 .version(newVersionNumber)
-                .payload(savedVersion)
+                .payload(file) // Payload is the new file state
                 .build());
 
-        return savedVersion;
+        // Return a representation of the new version (which is the file itself now)
+        return FileVersion.builder()
+                .file(file)
+                .version(newVersionNumber)
+                .size(file.getSize())
+                .hash(file.getHash())
+                .storagePath(file.getStoragePath())
+                .createdByUserId(userId)
+                .createdAt(LocalDateTime.now())
+                .build();
 
     }
 
@@ -196,7 +221,7 @@ public class VersionService {
                 // Warning: deduplication check is needed in real word
                 storageServiceClient.deleteFile(v.getFile().getId().toString(), v.getVersion());
             } catch (Exception e) {
-                log.warn("Failed to delete version file from storage: fileId={}, version={}", 
+                log.warn("Failed to delete version file from storage: fileId={}, version={}",
                         v.getFile().getId(), v.getVersion());
             }
         }
@@ -227,7 +252,7 @@ public class VersionService {
                 try {
                     storageServiceClient.deleteFile(v.getFile().getId().toString(), v.getVersion());
                 } catch (Exception e) {
-                    log.warn("Failed to delete version file from storage: fileId={}, version={}", 
+                    log.warn("Failed to delete version file from storage: fileId={}, version={}",
                             v.getFile().getId(), v.getVersion());
                 }
             }

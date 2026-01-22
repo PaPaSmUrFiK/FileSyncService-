@@ -1,6 +1,5 @@
 package com.authservice.service;
 
-
 import com.authservice.exception.AuthException;
 import com.authservice.exception.UserBlockedException;
 import com.authservice.model.domain.Role;
@@ -33,13 +32,16 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final RoleService roleService;
     private final KafkaProducerService kafkaProducerService;
+    private final com.authservice.event.UserEventPublisher eventPublisher;
 
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpirationSeconds;
 
-    /* =========================
-       Register
-       ========================= */
+    /*
+     * =========================
+     * Register
+     * =========================
+     */
 
     @Override
     public TokenPairDto register(String email, String password, String name) {
@@ -56,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
                 .name(name)
                 .isBlocked(false)
                 .roles(Set.of(userRole))
+                .lastLoginAt(LocalDateTime.now()) // Set initial login time
                 .build();
 
         userRepository.save(user);
@@ -66,9 +69,11 @@ public class AuthServiceImpl implements AuthService {
         return issueTokens(user, null);
     }
 
-    /* =========================
-       Login
-       ========================= */
+    /*
+     * =========================
+     * Login
+     * =========================
+     */
 
     @Override
     public TokenPairDto login(String email, String password, String deviceInfo) {
@@ -84,15 +89,21 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user); // Validate we save the timestamp in Auth DB
 
         tokenService.revokeAllUserTokens(user.getId());
+
+        // Notify other services
+        kafkaProducerService.sendUserLoggedInEvent(user.getId());
 
         return issueTokens(user, deviceInfo);
     }
 
-    /* =========================
-       Refresh
-       ========================= */
+    /*
+     * =========================
+     * Refresh
+     * =========================
+     */
 
     @Override
     public TokenPairDto refresh(String refreshToken) {
@@ -110,9 +121,11 @@ public class AuthServiceImpl implements AuthService {
         return issueTokens(user, storedToken.getDeviceInfo());
     }
 
-    /* =========================
-       Validate
-       ========================= */
+    /*
+     * =========================
+     * Validate
+     * =========================
+     */
 
     @Override
     public void validate(String accessToken) {
@@ -121,27 +134,33 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    /* =========================
-       Logout
-       ========================= */
+    /*
+     * =========================
+     * Logout
+     * =========================
+     */
 
     @Override
     public void logout(String refreshToken) {
         tokenService.revokeRefreshToken(refreshToken);
     }
 
-    /* =========================
-       Logout all
-       ========================= */
+    /*
+     * =========================
+     * Logout all
+     * =========================
+     */
 
     @Override
     public void logoutAll(UUID userId) {
         tokenService.revokeAllUserTokens(userId);
     }
 
-    /* =========================
-       Role management
-       ========================= */
+    /*
+     * =========================
+     * Role management
+     * =========================
+     */
 
     @Override
     public void assignRole(UUID userId, String roleName) {
@@ -158,9 +177,11 @@ public class AuthServiceImpl implements AuthService {
         return roleService.getUserRoles(userId);
     }
 
-    /* =========================
-       Internal helper
-       ========================= */
+    /*
+     * =========================
+     * Internal helper
+     * =========================
+     */
 
     private TokenPairDto issueTokens(User user, String deviceInfo) {
         Set<String> roles = user.getRoles()
@@ -171,13 +192,11 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getEmail(),
-                roles
-        );
+                roles);
 
         String refreshToken = tokenService.createRefreshToken(
                 user.getId(),
-                deviceInfo
-        );
+                deviceInfo);
 
         return TokenPairDto.builder()
                 .accessToken(accessToken)
@@ -188,5 +207,129 @@ public class AuthServiceImpl implements AuthService {
                 .roles(roles)
                 .expiresIn(accessTokenExpirationSeconds)
                 .build();
+    }
+
+    /*
+     * =========================
+     * User blocking
+     * =========================
+     */
+
+    @Override
+    public void blockUser(UUID userId, String reason) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthException("User not found: " + userId));
+
+        user.setIsBlocked(true);
+        user.setBlockedReason(reason);
+        user.setBlockedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // Revoke all tokens
+        tokenService.revokeAllUserTokens(userId);
+
+        // Publish event for UserService to sync
+        kafkaProducerService.sendUserBlockedEvent(userId, reason);
+    }
+
+    @Override
+    public void unblockUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthException("User not found: " + userId));
+
+        user.setIsBlocked(false);
+        user.setBlockedReason(null);
+        user.setBlockedAt(null);
+        userRepository.save(user);
+
+        // Publish event for UserService to sync
+        kafkaProducerService.sendUserUnblockedEvent(userId);
+    }
+
+    /*
+     * =========================
+     * Statistics
+     * =========================
+     */
+
+    @Override
+    public int getActiveUsersCount(long fromTimestamp, long toTimestamp) {
+        LocalDateTime from = LocalDateTime.ofEpochSecond(fromTimestamp, 0, java.time.ZoneOffset.UTC);
+        LocalDateTime to = LocalDateTime.ofEpochSecond(toTimestamp, 0, java.time.ZoneOffset.UTC);
+
+        return userRepository.countActiveUsers(from, to);
+    }
+
+    @Override
+    public java.util.List<String> getUsersActiveInLastMinutes(int minutes) {
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(minutes);
+        java.util.List<UUID> userIds = userRepository.findActiveUserIds(threshold);
+        return userIds.stream().map(UUID::toString).collect(Collectors.toList());
+    }
+
+    @Override
+    public int getAdminCount() {
+        return (int) userRepository.countByRoles_NameIn(java.util.List.of("ROLE_ADMIN"));
+    }
+
+    @Override
+    public int getBlockedUsersCount() {
+        return (int) userRepository.countByIsBlocked(true);
+    }
+
+    /*
+     * =========================
+     * User deletion
+     * =========================
+     */
+
+    @Override
+    public void deleteUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthException("User not found: " + userId));
+
+        // Revoke all tokens
+        tokenService.revokeAllUserTokens(userId);
+
+        // Delete user roles (if they are not cascaded by DB, though likely ManyToMany)
+        // JPA usually handles ManyToMany link table deletion if configured, but let's
+        // be safe
+        user.getRoles().clear();
+        userRepository.save(user); // Clear associations
+
+        // Delete user
+        userRepository.delete(user);
+
+        // Publish deletion event
+        kafkaProducerService.sendUserDeletedEvent(userId);
+    }
+
+    @Override
+    public void changePassword(UUID userId, String oldPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthException("User not found: " + userId));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw new AuthException("Invalid old password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Optionally revoke all tokens to force re-login, or keep them valid.
+        // For security, changing password usually implies revoking existing sessions.
+        tokenService.revokeAllUserTokens(userId);
+
+        // Publish user.password_changed event for notifications
+        try {
+            eventPublisher.publish(com.authservice.event.UserEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("user.password_changed")
+                    .userId(userId)
+                    .timestamp(LocalDateTime.now())
+                    .build());
+        } catch (Exception e) {
+            // Log but don't fail - password was already changed successfully
+        }
     }
 }

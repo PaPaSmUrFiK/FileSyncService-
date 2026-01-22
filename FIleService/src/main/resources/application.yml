@@ -31,8 +31,8 @@ spring:
     password: ${DB_PASSWORD:secret}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 50
+      minimum-idle: 10
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -68,6 +68,16 @@ spring:
   cache:
     type: none
 
+  # Thread Pool for Blocking Operations (JPA in WebFlux)
+  task:
+    execution:
+      pool:
+        core-size: 50
+        max-size: 100
+        queue-capacity: 500
+        keep-alive: 60s
+      thread-name-prefix: file-service-task-
+
   # Kafka Configuration
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
@@ -86,6 +96,8 @@ spring:
       enable-auto-commit: false
       properties:
         spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.fileservice.kafka.StorageEvent
     listener:
       ack-mode: manual
 
@@ -110,7 +122,8 @@ grpc:
 # Kafka Topics
 kafka:
   topics:
-    file-events: file.events
+    file-events: file-events
+    storage-events: storage.events
 
 # File Service Configuration
 file-service:

@@ -33,13 +33,18 @@ export function LoginPage() {
         await login(email, password);
         navigate('/files');
       } else {
-        if (password !== confirmPassword) {
-          setError('Пароли не совпадают');
+        if (!name.trim() || name.length < 3) {
+          setError('Имя должно быть не менее 3 символов');
           setIsLoading(false);
           return;
         }
-        if (!name.trim()) {
-          setError('Имя обязательно для заполнения');
+        if (password.length < 6) {
+          setError('Пароль должен быть не менее 6 символов');
+          setIsLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Пароли не совпадают');
           setIsLoading(false);
           return;
         }
@@ -50,8 +55,11 @@ export function LoginPage() {
       const message = err.message || '';
       if (message.includes('Invalid credentials')) {
         setError('Неверный логин или пароль');
-      } else if (message.includes('User is blocked')) {
-        setError('Ваша учетная запись заблокирована');
+      } else if (message.includes('PERMISSION_DENIED') || message.includes('User is blocked')) {
+        // Extract reason if present (format: "PERMISSION_DENIED - reason")
+        const parts = message.split(' - ');
+        const reason = parts.length > 1 ? parts[1] : '';
+        setError(reason ? `Ваша учетная запись заблокирована. Причина: ${reason}` : 'Ваша учетная запись заблокирована');
       } else if (message.includes('already registered')) {
         setError('Пользователь с таким email уже существует');
       } else {
@@ -150,15 +158,15 @@ export function LoginPage() {
               />
             )}
 
-            <CloudSyncButton 
-              type="submit" 
+            <CloudSyncButton
+              type="submit"
               className="w-full mt-6"
               disabled={isLoading}
             >
-              {isLoading 
-                ? 'Обработка...' 
-                : activeTab === 'login' 
-                  ? 'Войти' 
+              {isLoading
+                ? 'Обработка...'
+                : activeTab === 'login'
+                  ? 'Войти'
                   : 'Зарегистрироваться'
               }
             </CloudSyncButton>

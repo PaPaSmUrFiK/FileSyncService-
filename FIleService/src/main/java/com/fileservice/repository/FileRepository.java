@@ -1,6 +1,5 @@
 package com.fileservice.repository;
 
-
 import com.fileservice.model.File;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,47 +16,49 @@ import java.util.UUID;
 @Repository
 public interface FileRepository extends JpaRepository<File, UUID> {
 
-    Optional<File> findByIdAndUserId(UUID id, UUID userId);
+        Optional<File> findByIdAndUserId(UUID id, UUID userId);
 
-    Optional<File> findByPathAndUserIdAndIsDeletedFalse(String path, UUID userId);
+        Optional<File> findByPathAndUserIdAndIsDeletedFalse(String path, UUID userId);
 
-    Page<File> findByUserIdAndIsDeletedFalse(UUID userId, Pageable pageable);
+        Page<File> findByUserIdAndIsDeletedFalse(UUID userId, Pageable pageable);
 
-    Page<File> findByParentFolderIdAndIsDeletedFalse(UUID parentFolderId, Pageable pageable);
+        Page<File> findByParentFolderIdAndIsDeletedFalse(UUID parentFolderId, Pageable pageable);
 
-    Page<File> findByUserIdAndParentFolderIdAndIsDeletedFalse(
-            UUID userId, UUID parentFolderId, Pageable pageable);
+        Page<File> findByUserIdAndParentFolderIdAndIsDeletedFalse(
+                        UUID userId, UUID parentFolderId, Pageable pageable);
 
-    Page<File> findByUserIdAndParentFolderIdIsNullAndIsDeletedFalse(
-            UUID userId, Pageable pageable);
+        Page<File> findByUserIdAndParentFolderIdIsNullAndIsDeletedFalse(
+                        UUID userId, Pageable pageable);
 
-    List<File> findByHashAndIsDeletedFalse(String hash);
+        List<File> findByHashAndIsDeletedFalse(String hash);
 
-    Optional<File> findByHashAndUserIdAndIsDeletedFalse(String hash, UUID userId);
+        Optional<File> findByHashAndUserIdAndIsDeletedFalse(String hash, UUID userId);
 
-    @Query("SELECT f FROM File f WHERE f.userId = :userId AND f.isDeleted = false " +
-            "AND LOWER(f.name) LIKE LOWER(CONCAT('%', :query, '%'))")
-    Page<File> searchByName(@Param("userId") UUID userId,
-                            @Param("query") String query,
-                            Pageable pageable);
+        @Query("SELECT f FROM File f WHERE f.userId = :userId AND f.isDeleted = false " +
+                        "AND LOWER(f.name) LIKE LOWER(CONCAT('%', :query, '%'))")
+        Page<File> searchByName(@Param("userId") UUID userId,
+                        @Param("query") String query,
+                        Pageable pageable);
 
-    List<File> findByUserIdAndIsFolderTrueAndIsDeletedFalse(UUID userId);
+        List<File> findByUserIdAndIsFolderTrueAndIsDeletedFalse(UUID userId);
 
-    @Query("SELECT COALESCE(SUM(f.size), 0) FROM File f " +
-            "WHERE f.userId = :userId AND f.isDeleted = false AND f.isFolder = false")
-    Long calculateStorageUsed(@Param("userId") UUID userId);
+        @Query("SELECT COALESCE(SUM(f.size), 0) FROM File f " +
+                        "WHERE f.userId = :userId AND f.isDeleted = false AND f.isFolder = false")
+        Long calculateStorageUsed(@Param("userId") UUID userId);
 
-    long countByUserIdAndIsDeletedFalse(UUID userId);
+        long countByUserIdAndIsDeletedFalse(UUID userId);
 
-    Page<File> findByUserIdAndIsDeletedTrue(UUID userId, Pageable pageable);
+        Page<File> findByUserIdAndIsDeletedTrue(UUID userId, Pageable pageable);
 
-    boolean existsByPathAndUserIdAndIsDeletedFalse(String path, UUID userId);
+        List<File> findAllByUserIdAndIsDeletedTrue(UUID userId);
 
-    @Query("SELECT f FROM File f WHERE f.isDeleted = true AND f.deletedAt < :beforeDate")
-    List<File> findFilesForCleanup(@Param("beforeDate") LocalDateTime beforeDate);
+        boolean existsByPathAndUserIdAndIsDeletedFalse(String path, UUID userId);
 
-    @Query("SELECT f FROM File f WHERE f.userId = :userId AND f.isDeleted = false " +
-            "AND f.path LIKE CONCAT(:folderPath, '%')")
-    List<File> findAllChildrenByPath(@Param("userId") UUID userId,
-                                     @Param("folderPath") String folderPath);
+        @Query("SELECT f FROM File f WHERE f.isDeleted = true AND f.deletedAt < :beforeDate")
+        List<File> findFilesForCleanup(@Param("beforeDate") LocalDateTime beforeDate);
+
+        @Query("SELECT f FROM File f WHERE f.userId = :userId AND f.isDeleted = false " +
+                        "AND f.path LIKE CONCAT(:folderPath, '%')")
+        List<File> findAllChildrenByPath(@Param("userId") UUID userId,
+                        @Param("folderPath") String folderPath);
 }

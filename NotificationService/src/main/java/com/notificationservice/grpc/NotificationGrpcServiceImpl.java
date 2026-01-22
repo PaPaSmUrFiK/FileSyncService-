@@ -28,6 +28,8 @@ public class NotificationGrpcServiceImpl extends NotificationServiceGrpc.Notific
                 request.getTitle(),
                 request.getMessage(),
                 request.getPriority(),
+                null, // resourceId - not available in gRPC request yet
+                null, // resourceType
                 request.getDataMap(),
                 request.getChannelsList()).subscribe(
                         v -> {
@@ -58,7 +60,11 @@ public class NotificationGrpcServiceImpl extends NotificationServiceGrpc.Notific
                             responseObserver.onNext(response);
                             responseObserver.onCompleted();
                         },
-                        e -> responseObserver.onError(e));
+                        e -> {
+                            log.error("Error getting notifications for user {}: {}", request.getUserId(),
+                                    e.getMessage(), e);
+                            responseObserver.onError(e);
+                        });
     }
 
     @Override
@@ -70,42 +76,75 @@ public class NotificationGrpcServiceImpl extends NotificationServiceGrpc.Notific
                                     .onNext(UnreadCountResponse.newBuilder().setCount(count.intValue()).build());
                             responseObserver.onCompleted();
                         },
-                        e -> responseObserver.onError(e));
+                        e -> {
+                            log.error("Error getting unread count for user {}: {}", request.getUserId(), e.getMessage(),
+                                    e);
+                            responseObserver.onError(e);
+                        });
     }
 
     @Override
     public void markAsRead(MarkAsReadRequest request, StreamObserver<EmptyResponse> responseObserver) {
         notificationService
                 .markAsRead(UUID.fromString(request.getNotificationId()), UUID.fromString(request.getUserId()))
-                .subscribe(
-                        v -> {
-                            responseObserver.onNext(EmptyResponse.newBuilder().build());
-                            responseObserver.onCompleted();
-                        },
-                        e -> responseObserver.onError(e));
+                .doOnSuccess(v -> {
+                    responseObserver.onNext(EmptyResponse.newBuilder().build());
+                    responseObserver.onCompleted();
+                })
+                .doOnError(e -> {
+                    log.error("Error marking notification as read: {}", e.getMessage(), e);
+                    responseObserver.onError(e);
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .subscribe();
     }
 
     @Override
     public void markAllAsRead(MarkAllAsReadRequest request, StreamObserver<EmptyResponse> responseObserver) {
         notificationService.markAllAsRead(UUID.fromString(request.getUserId()))
-                .subscribe(
-                        v -> {
-                            responseObserver.onNext(EmptyResponse.newBuilder().build());
-                            responseObserver.onCompleted();
-                        },
-                        e -> responseObserver.onError(e));
+                .doOnSuccess(v -> {
+                    responseObserver.onNext(EmptyResponse.newBuilder().build());
+                    responseObserver.onCompleted();
+                })
+                .doOnError(e -> {
+                    log.error("Error marking all notifications as read: {}", e.getMessage(), e);
+                    responseObserver.onError(e);
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .subscribe();
     }
 
     @Override
     public void deleteNotification(DeleteNotificationRequest request, StreamObserver<EmptyResponse> responseObserver) {
         notificationService
-                .deleteNotification(UUID.fromString(request.getNotificationId()), UUID.fromString(request.getUserId()))
-                .subscribe(
-                        v -> {
-                            responseObserver.onNext(EmptyResponse.newBuilder().build());
-                            responseObserver.onCompleted();
-                        },
-                        e -> responseObserver.onError(e));
+                .deleteNotification(UUID.fromString(request.getNotificationId()),
+                        UUID.fromString(request.getUserId()))
+                .doOnSuccess(v -> {
+                    responseObserver.onNext(EmptyResponse.newBuilder().build());
+                    responseObserver.onCompleted();
+                })
+                .doOnError(e -> {
+                    log.error("Error deleting notification: {}", e.getMessage(), e);
+                    responseObserver.onError(e);
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .subscribe();
+    }
+
+    @Override
+    public void deleteAllNotifications(DeleteAllNotificationsRequest request,
+            StreamObserver<EmptyResponse> responseObserver) {
+        notificationService.deleteAllNotifications(UUID.fromString(request.getUserId()))
+                .doOnSuccess(v -> {
+                    responseObserver.onNext(EmptyResponse.newBuilder().build());
+                    responseObserver.onCompleted();
+                })
+                .doOnError(e -> {
+                    log.error("Error deleting all notifications: {}", e.getMessage(), e);
+                    responseObserver.onError(e);
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .subscribe();
     }
 
     @Override

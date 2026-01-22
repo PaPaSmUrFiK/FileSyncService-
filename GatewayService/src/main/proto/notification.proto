@@ -18,6 +18,7 @@ service NotificationService {
   rpc MarkAsRead(MarkAsReadRequest) returns (EmptyResponse);
   rpc MarkAllAsRead(MarkAllAsReadRequest) returns (EmptyResponse);
   rpc DeleteNotification(DeleteNotificationRequest) returns (EmptyResponse);
+  rpc DeleteAllNotifications(DeleteAllNotificationsRequest) returns (EmptyResponse);
   
   // Push токены
   rpc RegisterPushToken(RegisterPushTokenRequest) returns (EmptyResponse);
@@ -101,6 +102,10 @@ message MarkAllAsReadRequest {
 message DeleteNotificationRequest {
   string notification_id = 1;
   string user_id = 2;
+}
+
+message DeleteAllNotificationsRequest {
+  string user_id = 1;
 }
 
 message RegisterPushTokenRequest {

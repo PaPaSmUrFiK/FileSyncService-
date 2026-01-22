@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +29,7 @@ import java.util.UUID;
 public class FileService {
 
     private final FileRepository fileRepository;
+    private final com.fileservice.repository.FileShareRepository shareRepository;
     private final UserServiceClient userServiceClient;
     private final StorageServiceClient storageServiceClient;
     private final FileEventPublisher eventPublisher;
@@ -121,7 +124,7 @@ public class FileService {
 
         eventPublisher.publish(FileEvent.builder()
                 .eventId(UUID.randomUUID().toString())
-                .eventType("file.created")
+                .eventType("file.uploaded")
                 .fileId(savedFile.getId())
                 .userId(savedFile.getUserId())
                 .timestamp(LocalDateTime.now())
@@ -139,7 +142,9 @@ public class FileService {
     @Transactional(readOnly = true)
     public Optional<File> getFile(UUID fileId, UUID userId) {
         log.debug("Getting file: id={}, userId={}", fileId, userId);
-        Optional<File> fileOpt = fileRepository.findByIdAndUserId(fileId, userId)
+        // Relaxing check to findById to allow shared access (permission checked by
+        // controller/grpc)
+        Optional<File> fileOpt = fileRepository.findById(fileId)
                 .filter(file -> !file.isDeleted());
 
         fileOpt.ifPresent(file -> {
@@ -172,12 +177,20 @@ public class FileService {
     public File updateFile(UUID fileId, UUID userId, File updatedFile) {
         log.debug("Updating file: id={}, userId={}", fileId, userId);
 
-        File existingFile = fileRepository.findByIdAndUserId(fileId, userId)
+        // Relaxing check to findById. Permission checked by GrpcService.
+        File existingFile = fileRepository.findById(fileId)
                 .filter(file -> !file.isDeleted())
                 .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("File with id %s not found for user %s", fileId, userId)));
+                        String.format("File with id %s not found", fileId)));
 
         boolean contentChanged = false;
+
+        // Check for name change BEFORE updating the entity
+        String oldName = existingFile.getName();
+        boolean nameChanged = updatedFile.getName() != null
+                && !updatedFile.getName().equals(oldName);
+
+        long oldSize = existingFile.getSize();
 
         // Обновляем поля
         if (updatedFile.getName() != null) {
@@ -198,9 +211,46 @@ public class FileService {
             log.warn("Healed missing storage_path for file {}: {}", fileId, healedPath);
         }
 
+        // --- QUOTA CHECK START ---
+        // Если меняется размер, проверяем квоту ВЛАДЕЛЬЦА
+        if (updatedFile.getSize() != null && updatedFile.getSize() > existingFile.getSize()) {
+            long sizeDiff = updatedFile.getSize() - existingFile.getSize();
+            try {
+                // Check quota for OWNER (existingFile.getUserId()), not necessarily the actor
+                // (userId)
+                boolean hasQuota = userServiceClient.checkQuota(existingFile.getUserId(), sizeDiff);
+                if (!hasQuota) {
+                    log.warn("Quota check failed for owner {} during update by {}: sizeDiff={}",
+                            existingFile.getUserId(), userId, sizeDiff);
+                    throw new IllegalArgumentException(
+                            "Owner's storage quota exceeded.");
+                }
+            } catch (RuntimeException e) {
+                // Re-throw valid business exceptions
+                if (e.getMessage().contains("quota"))
+                    throw e;
+                log.error("Error checking quota checks for owner {}: {}", existingFile.getUserId(), e.getMessage());
+                // Optional: fail or proceed? Safety first -> fail?
+                // Let's assume fail if service is reachable but returns false.
+                // If service error, maybe block to prevent abuse.
+                throw new IllegalArgumentException("Failed to verify storage quota during update.");
+            }
+        }
+        // --- QUOTA CHECK END ---
+
         // Если меняется размер или хеш, считаем что меняется контент -> версионирование
-        if ((updatedFile.getSize() != null && !updatedFile.getSize().equals(existingFile.getSize())) ||
-                (updatedFile.getHash() != null && !updatedFile.getHash().equals(existingFile.getHash()))) {
+        // ВАЖНО: Игнорируем size=0, так как это часто приходит при обновлении
+        // метаданных (rename)
+        // и не означает реальное зануление файла.
+        boolean isSizeChanged = updatedFile.getSize() != null
+                && updatedFile.getSize() > 0
+                && !updatedFile.getSize().equals(existingFile.getSize());
+
+        boolean isHashChanged = updatedFile.getHash() != null
+                && !updatedFile.getHash().isEmpty()
+                && !updatedFile.getHash().equals(existingFile.getHash());
+
+        if (isSizeChanged || isHashChanged) {
 
             contentChanged = true;
 
@@ -210,7 +260,7 @@ public class FileService {
                     .size(existingFile.getSize())
                     .hash(existingFile.getHash())
                     .storagePath(existingFile.getStoragePath())
-                    .createdBy(userId)
+                    .createdByUserId(userId)
                     .build();
 
             try {
@@ -247,6 +297,17 @@ public class FileService {
         }
 
         File savedFile = fileRepository.save(existingFile);
+
+        // Update storage used if size changed
+        if (updatedFile.getSize() != null && !updatedFile.getSize().equals(oldSize)) {
+            long sizeDiff = updatedFile.getSize() - oldSize;
+            try {
+                userServiceClient.updateStorageUsed(savedFile.getUserId(), sizeDiff);
+            } catch (Exception e) {
+                log.error("Failed to update storage used for user {}", savedFile.getUserId(), e);
+            }
+        }
+
         log.info("File updated: id={}, userId={}", savedFile.getId(), userId);
 
         // Если контент меняется, или клиент явно просит - выдаем UploadUrl
@@ -264,14 +325,87 @@ public class FileService {
             }
         }
 
-        eventPublisher.publish(FileEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .eventType("file.updated")
-                .fileId(savedFile.getId())
-                .userId(savedFile.getUserId())
-                .timestamp(LocalDateTime.now())
-                .version(savedFile.getVersion())
-                .build());
+        // Publish specific events based on what changed
+        if (contentChanged) {
+            // Version upload event
+            eventPublisher.publish(FileEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("file.version_uploaded")
+                    .fileId(savedFile.getId())
+                    .userId(savedFile.getUserId())
+                    .timestamp(LocalDateTime.now())
+                    .version(savedFile.getVersion())
+                    .payload(savedFile)
+                    .build());
+        } else if (nameChanged) {
+            // Rename event
+            eventPublisher.publish(FileEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("file.renamed")
+                    .fileId(savedFile.getId())
+                    .userId(savedFile.getUserId())
+                    .timestamp(LocalDateTime.now())
+                    .version(savedFile.getVersion())
+                    .metadata(Map.of("oldName", oldName, "newName", savedFile.getName()))
+                    .payload(savedFile)
+                    .build());
+        } else {
+            // Generic update event
+            eventPublisher.publish(FileEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("file.updated")
+                    .fileId(savedFile.getId())
+                    .userId(savedFile.getUserId())
+                    .timestamp(LocalDateTime.now())
+                    .version(savedFile.getVersion())
+                    .payload(savedFile)
+                    .build());
+        }
+
+        // --- Notify shared users ---
+        try {
+            List<com.fileservice.model.FileShare> shares = shareRepository.findByFileId(savedFile.getId());
+            for (com.fileservice.model.FileShare share : shares) {
+                // Skip if the recipient is the one performing the action (actor)
+                // Note: userId is the actor here.
+                if (share.getSharedWithUserId().equals(userId))
+                    continue;
+
+                // Also skip if recipient is the owner (already notified above, if owner !=
+                // actor)
+                // But wait, above we notify savedFile.getUserId() (owner).
+                // If actor (userId) != owner, owner gets notified.
+                // If actor == owner, owner gets notified.
+                // We just need to ensure we don't notify the same person twice via this loop.
+                if (share.getSharedWithUserId().equals(savedFile.getUserId()))
+                    continue;
+
+                String eventType = contentChanged ? "file.version_uploaded"
+                        : nameChanged ? "file.renamed" : "file.updated";
+
+                java.util.Map<String, String> metadata = new java.util.HashMap<>();
+                if (nameChanged) {
+                    metadata.put("oldName", oldName);
+                    metadata.put("newName", savedFile.getName());
+                }
+                metadata.put("fileName", savedFile.getName());
+                metadata.put("sharedBy", userId.toString()); // Actor who updated it
+
+                eventPublisher.publish(FileEvent.builder()
+                        .eventId(UUID.randomUUID().toString())
+                        .eventType(eventType)
+                        .fileId(savedFile.getId())
+                        .userId(share.getSharedWithUserId()) // Target recipient
+                        .timestamp(LocalDateTime.now())
+                        .version(savedFile.getVersion())
+                        .metadata(metadata)
+                        .payload(savedFile)
+                        .build());
+            }
+        } catch (Exception e) {
+            log.error("Failed to notify shared users for file update: {}", savedFile.getId(), e);
+        }
+        // ---------------------------
 
         return savedFile;
     }
@@ -279,44 +413,99 @@ public class FileService {
     /**
      * Мягкое удаление файла (is_deleted = true)
      */
+    /**
+     * Удаление файла.
+     * Если файл активен -> Мягкое удаление (is_deleted = true).
+     * Если файл уже в корзине -> Окончательное удаление.
+     */
     public void deleteFile(UUID fileId, UUID userId) {
         log.debug("Deleting file: id={}, userId={}", fileId, userId);
 
-        File file = fileRepository.findByIdAndUserId(fileId, userId)
-                .filter(f -> !f.isDeleted())
+        File file = fileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("File with id %s not found for user %s", fileId, userId)));
+                        String.format("File with id %s not found", fileId)));
 
-        file.softDelete();
-        fileRepository.save(file);
+        // Получаем всех пользователей, с которыми расшарен файл, чтобы уведомить их
+        List<com.fileservice.model.FileShare> shares = shareRepository.findByFileId(fileId);
 
-        // Уведомляем StorageService (согласно требованиям 1.4)
-        try {
-            storageServiceClient.deleteFile(file.getId().toString(), null); // Delete all versions
-        } catch (Exception e) {
-            log.warn("Failed to notify storage service about deletion", e);
-        }
+        if (file.isDeleted()) {
+            // HARD DELETE
+            log.info("Permanently deleting file: id={}, userId={}", fileId, userId);
 
-        // Обновляем квоту (освобождаем место) - только для файлов, не для папок
-        if (file.getSize() > 0) {
-            try {
-                userServiceClient.updateStorageUsed(file.getUserId(), -file.getSize());
-            } catch (Exception e) {
-                log.error("Failed to update storage used (decrement) for user {}", file.getUserId(), e);
+            // 1. Физическое удаление из хранилища (если это файл)
+            if (!file.isFolder()) {
+                try {
+                    // Удаляем текущий файл (все версии удаляются в storage-service если не указана
+                    // версия,
+                    // или storage-service просто чистит по префиксу.
+                    // В данном случае deleteFile(fileId, null) удаляет все versions в
+                    // StorageService)
+                    storageServiceClient.deleteFile(file.getId().toString(), null);
+                } catch (Exception e) {
+                    log.error("Failed to delete file {} from storage during hard delete", file.getId(), e);
+                    // Продолжаем удаление из БД, чтобы не оставлять мусор, даже если в S3 останется
+                }
             }
+
+            // 2. Освобождаем квоту
+            if (file.getSize() > 0) {
+                try {
+                    // Use file.getUserId() (owner) for quota update
+                    userServiceClient.updateStorageUsed(file.getUserId(), -file.getSize());
+                } catch (Exception e) {
+                    log.error("Failed to update storage used (decrement) for user {}", file.getUserId(), e);
+                }
+            }
+
+            // 3. Удаляем из БД
+            fileRepository.delete(file);
+
+            // Уведомляем владельца
+            eventPublisher.publish(FileEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("file.hard_deleted")
+                    .fileId(fileId)
+                    .userId(userId) // Triggered by actor
+                    .timestamp(LocalDateTime.now())
+                    .version(file.getVersion())
+                    .payload(file)
+                    .build());
+
+        } else {
+            // SOFT DELETE
+            file.softDelete();
+            fileRepository.save(file);
+
+            log.info("File soft deleted: id={}, userId={}", fileId, userId);
+
+            // Уведомляем владельца
+            eventPublisher.publish(FileEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("file.deleted")
+                    .fileId(fileId)
+                    .userId(userId)
+                    .timestamp(LocalDateTime.now())
+                    .version(file.getVersion())
+                    .payload(file)
+                    .build());
         }
 
-        log.info("File soft deleted: id={}, userId={}", fileId, userId);
+        // Уведомляем всех пользователей, с которыми был расшарен файл
+        for (com.fileservice.model.FileShare share : shares) {
+            java.util.Map<String, String> metadata = new java.util.HashMap<>();
+            metadata.put("fileName", file.getName());
+            metadata.put("ownerId", file.getUserId().toString());
 
-        eventPublisher.publish(FileEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .eventType("file.deleted")
-                .fileId(fileId)
-                .userId(userId)
-                .timestamp(LocalDateTime.now())
-                .version(file.getVersion())
-                .build());
-
+            eventPublisher.publish(FileEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("file.unshared")
+                    .fileId(fileId)
+                    .userId(share.getSharedWithUserId()) // Notify the user who lost access
+                    .timestamp(LocalDateTime.now())
+                    .version(file.getVersion())
+                    .metadata(metadata)
+                    .build());
+        }
     }
 
     /**
@@ -325,13 +514,13 @@ public class FileService {
     public File moveFile(UUID fileId, UUID newParentId, UUID userId) {
         log.debug("Moving file: fileId={}, newParentId={}, userId={}", fileId, newParentId, userId);
 
-        File file = fileRepository.findByIdAndUserId(fileId, userId)
+        File file = fileRepository.findById(fileId)
                 .filter(f -> !f.isDeleted())
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
 
         File newParent = null;
         if (newParentId != null) {
-            newParent = fileRepository.findByIdAndUserId(newParentId, userId)
+            newParent = fileRepository.findById(newParentId)
                     .filter(f -> !f.isDeleted() && f.isFolder())
                     .orElseThrow(() -> new IllegalArgumentException("Target folder not found"));
 
@@ -382,8 +571,111 @@ public class FileService {
             return fileRepository.findByUserIdAndParentFolderIdIsNullAndIsDeletedFalse(
                     userId, pageable);
         } else {
+            // Check if parent itself is deleted
+            Optional<File> parent = fileRepository.findById(parentFolderId);
+            if (parent.isPresent() && parent.get().isDeleted()) {
+                return Page.empty();
+            }
             return fileRepository.findByUserIdAndParentFolderIdAndIsDeletedFalse(
                     userId, parentFolderId, pageable);
+        }
+    }
+
+    /**
+     * Получение файлов из корзины
+     */
+    @Transactional(readOnly = true)
+    public Page<File> listTrash(UUID userId, Pageable pageable) {
+        log.debug("Listing trash for user: {}", userId);
+        return fileRepository.findByUserIdAndIsDeletedTrue(userId, pageable);
+    }
+
+    /**
+     * Восстановление файла из корзины
+     */
+    public void restoreFile(UUID fileId, UUID userId) {
+        log.debug("Restoring file: id={}, userId={}", fileId, userId);
+
+        File file = fileRepository.findByIdAndUserId(fileId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+
+        if (!file.isDeleted()) {
+            return; // Idempotent
+        }
+
+        // Рекурсивно восстанавливаем родителей, если они были удалены (Google Drive
+        // style)
+        restoreParentChain(file);
+
+        file.restore();
+        fileRepository.save(file);
+
+        log.info("File restored: id={}, userId={}", fileId, userId);
+
+        eventPublisher.publish(FileEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType("file.restored")
+                .fileId(fileId)
+                .userId(userId)
+                .timestamp(LocalDateTime.now())
+                .version(file.getVersion())
+                .payload(file)
+                .build());
+    }
+
+    private void restoreParentChain(File file) {
+        File parent = file.getParentFolder();
+        if (parent != null && parent.isDeleted()) {
+            log.info("Automatically restoring parent folder {} for file {}", parent.getId(), file.getId());
+            restoreParentChain(parent);
+            parent.restore();
+            fileRepository.save(parent);
+        }
+    }
+
+    /**
+     * Окончательное удаление всех файлов из корзины
+     */
+    public void emptyTrash(UUID userId) {
+        log.info("Emptying trash for user: {}", userId);
+
+        // 1. Получаем список всех удаленных файлов
+        List<File> trashFiles = fileRepository.findAllByUserIdAndIsDeletedTrue(userId);
+
+        long totalReleasedSpace = 0;
+
+        // 2. Для каждого файла вызываем физическое удаление
+        for (File file : trashFiles) {
+            if (!file.isFolder()) {
+                try {
+                    // Пытаемся удалить из хранилища
+                    storageServiceClient.deleteFile(file.getId().toString(), null);
+                    totalReleasedSpace += file.getSize();
+                } catch (Exception e) {
+                    log.error("Failed to delete file {} from storage during empty trash", file.getId(), e);
+                    // Продолжаем, но не удаляем из БД этот файл, чтобы можно было попробовать
+                    // позже?
+                    // Или удаляем все равно? Пользователь ожидает очистки.
+                    // Обычно лучше не удалять из БД если физически файл остался,
+                    // чтобы не "забыть" про него в хранилище.
+                    continue;
+                }
+            }
+
+            // 3. Только если успешно (или если папка) -> удаляем из БД
+            // Для папок физического удаления в StorageService нет (они обычно transient в
+            // S3/MinIO)
+            fileRepository.delete(file);
+        }
+
+        // 4. Обновляем квоту пользователя (освобождаем место)
+        if (totalReleasedSpace > 0) {
+            try {
+                userServiceClient.updateStorageUsed(userId, -totalReleasedSpace);
+                log.info("User quota updated: released {} bytes for user {}", totalReleasedSpace, userId);
+            } catch (Exception e) {
+                log.error("Failed to update storage used (decrement) after emptying trash for user {}", userId, e);
+            }
         }
     }
 

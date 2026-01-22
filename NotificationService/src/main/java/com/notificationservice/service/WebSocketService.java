@@ -11,4 +11,8 @@ public interface WebSocketService {
     Mono<Void> sendReadConfirmation(UUID userId, UUID notificationId);
 
     Mono<Void> sendAllReadConfirmation(UUID userId, int markedCount);
+
+    Mono<Void> sendDeleteConfirmation(UUID userId, UUID notificationId);
+
+    Mono<Void> sendAllDeleteConfirmation(UUID userId);
 }

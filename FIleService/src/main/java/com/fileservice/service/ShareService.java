@@ -89,15 +89,22 @@ public class ShareService {
                 // Создаем новое расшаривание
                 FileShare share = FileShare.builder()
                                 .file(file)
-                                .ownerId(ownerId)
+                                .createdBy(ownerId)
                                 .sharedWithUserId(sharedWithUserId)
                                 .permission(permission)
                                 .expiresAt(expiresAt)
+                                .isActive(true)
                                 .build();
 
                 FileShare savedShare = shareRepository.save(share);
                 log.info("File shared: id={}, fileId={}, ownerId={}, sharedWithUserId={}, permission={}",
                                 savedShare.getId(), fileId, ownerId, sharedWithUserId, permission);
+
+                // Создаем metadata для события
+                java.util.Map<String, String> metadata = new java.util.HashMap<>();
+                metadata.put("fileName", file.getName());
+                metadata.put("sharedWithUserId", sharedWithUserId.toString());
+                metadata.put("permission", permission.name());
 
                 eventPublisher.publish(FileEvent.builder()
                                 .eventId(UUID.randomUUID().toString())
@@ -107,6 +114,7 @@ public class ShareService {
                                 .timestamp(LocalDateTime.now())
                                 .version(1)
                                 .payload(savedShare)
+                                .metadata(metadata)
                                 .build());
 
                 return savedShare;
@@ -131,8 +139,27 @@ public class ShareService {
                                         "Only file owner can revoke shares");
                 }
 
+                // Получаем информацию о файле для уведомления
+                File file = fileRepository.findById(fileId)
+                                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+
                 shareRepository.delete(share);
                 log.info("Share revoked: fileId={}, sharedWithUserId={}", fileId, sharedWithUserId);
+
+                // Уведомляем пользователя об отзыве доступа
+                java.util.Map<String, String> metadata = new java.util.HashMap<>();
+                metadata.put("fileName", file.getName());
+                metadata.put("ownerId", ownerId.toString());
+
+                eventPublisher.publish(FileEvent.builder()
+                                .eventId(UUID.randomUUID().toString())
+                                .eventType("file.unshared")
+                                .fileId(fileId)
+                                .userId(sharedWithUserId) // Notify the user who lost access
+                                .timestamp(LocalDateTime.now())
+                                .version(1)
+                                .metadata(metadata)
+                                .build());
         }
 
         /**
@@ -141,7 +168,7 @@ public class ShareService {
         public void revokeAllShares(UUID fileId, UUID ownerId) {
                 log.debug("Revoking all shares for file: fileId={}, ownerId={}", fileId, ownerId);
 
-                fileRepository.findByIdAndUserId(fileId, ownerId)
+                File file = fileRepository.findByIdAndUserId(fileId, ownerId)
                                 .filter(f -> !f.isDeleted())
                                 .orElseThrow(() -> new IllegalArgumentException(
                                                 String.format("File with id %s not found for owner %s", fileId,
@@ -151,6 +178,23 @@ public class ShareService {
                 shareRepository.deleteAll(shares);
 
                 log.info("All shares revoked for file: fileId={}, count={}", fileId, shares.size());
+
+                // Уведомляем всех пользователей
+                for (FileShare share : shares) {
+                        java.util.Map<String, String> metadata = new java.util.HashMap<>();
+                        metadata.put("fileName", file.getName());
+                        metadata.put("ownerId", ownerId.toString());
+
+                        eventPublisher.publish(FileEvent.builder()
+                                        .eventId(UUID.randomUUID().toString())
+                                        .eventType("file.unshared")
+                                        .fileId(fileId)
+                                        .userId(share.getSharedWithUserId())
+                                        .timestamp(LocalDateTime.now())
+                                        .version(1)
+                                        .metadata(metadata)
+                                        .build());
+                }
         }
 
         /**
@@ -160,7 +204,21 @@ public class ShareService {
         public Page<FileShare> getSharedFiles(UUID userId, Pageable pageable) {
                 log.debug("Getting shared files for user: userId={}, page={}, size={}",
                                 userId, pageable.getPageNumber(), pageable.getPageSize());
-                return shareRepository.findActiveSharesForUser(userId, LocalDateTime.now(), pageable);
+
+                // First, get IDs with pagination
+                Page<UUID> shareIdsPage = shareRepository.findActiveShareIdsForUser(userId, LocalDateTime.now(),
+                                pageable);
+
+                if (shareIdsPage.isEmpty()) {
+                        return Page.empty(pageable);
+                }
+
+                // Then fetch full entities with files
+                List<FileShare> shares = shareRepository.findByIdInWithFile(shareIdsPage.getContent());
+
+                // Return as Page
+                return new org.springframework.data.domain.PageImpl<>(shares, pageable,
+                                shareIdsPage.getTotalElements());
         }
 
         /**
@@ -248,5 +306,221 @@ public class ShareService {
         @Transactional(readOnly = true)
         public long countActiveShares(UUID fileId) {
                 return shareRepository.countActiveShares(fileId, LocalDateTime.now());
+        }
+
+        /**
+         * Список файлов, расшаренных со мной (для RPC ListSharedWithMe)
+         */
+        @Transactional(readOnly = true)
+        public List<FileShare> listSharedWithMe(UUID userId) {
+                log.debug("Listing files shared with user: userId={}", userId);
+
+                // Get all share IDs (unpaged)
+                Page<UUID> shareIdsPage = shareRepository.findActiveShareIdsForUser(userId, LocalDateTime.now(),
+                                Pageable.unpaged());
+
+                if (shareIdsPage.isEmpty()) {
+                        return List.of();
+                }
+
+                // Fetch full entities with files
+                return shareRepository.findByIdInWithFile(shareIdsPage.getContent());
+        }
+
+        /**
+         * Список моих shares (для RPC ListMyShares)
+         * Возвращает все shares для файлов, принадлежащих пользователю
+         */
+        @Transactional(readOnly = true)
+        public List<FileShare> listMyShares(UUID ownerId, UUID fileId) {
+                log.debug("Listing my shares: ownerId={}, fileId={}", ownerId, fileId);
+
+                if (fileId != null) {
+                        // Shares для конкретного файла
+                        File file = fileRepository.findByIdAndUserId(fileId, ownerId)
+                                        .filter(f -> !f.isDeleted())
+                                        .orElseThrow(() -> new IllegalArgumentException(
+                                                        String.format("File with id %s not found for owner %s", fileId,
+                                                                        ownerId)));
+
+                        return shareRepository.findActiveSharesByFileId(fileId, LocalDateTime.now());
+                } else {
+                        // Все shares для всех файлов пользователя
+                        List<File> userFiles = fileRepository.findByUserIdAndIsDeletedFalse(ownerId, Pageable.unpaged())
+                                        .getContent();
+                        List<UUID> fileIds = userFiles.stream().map(File::getId).toList();
+
+                        return shareRepository.findByFileIdIn(fileIds).stream()
+                                        .filter(share -> share.getExpiresAt() == null
+                                                        || share.getExpiresAt().isAfter(LocalDateTime.now()))
+                                        .toList();
+                }
+        }
+
+        /**
+         * Отзыв share по ID (для RPC RevokeShare)
+         */
+        public void revokeShareById(UUID shareId, UUID ownerId) {
+                log.debug("Revoking share by ID: shareId={}, ownerId={}", shareId, ownerId);
+
+                FileShare share = shareRepository.findById(shareId)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                String.format("Share with id %s not found", shareId)));
+
+                // Проверка, что отзыв делает владелец файла ИЛИ сам пользователь, которому
+                // расшарили
+                if (!share.getOwnerId().equals(ownerId) && !share.getSharedWithUserId().equals(ownerId)) {
+                        throw new IllegalArgumentException(
+                                        "Only file owner or the recipient can revoke shares");
+                }
+
+                shareRepository.delete(share);
+                log.info("Share revoked: shareId={}, fileId={}, sharedWithUserId={}",
+                                shareId, share.getFile().getId(), share.getSharedWithUserId());
+
+                eventPublisher.publish(FileEvent.builder()
+                                .eventId(UUID.randomUUID().toString())
+                                .eventType("file.share.revoked")
+                                .fileId(share.getFile().getId())
+                                .userId(ownerId)
+                                .timestamp(LocalDateTime.now())
+                                .payload(share)
+                                .build());
+        }
+
+        /**
+         * Получение контекста доступа к файлу (для RPC GetFileAccessContext)
+         * Возвращает информацию о правах доступа пользователя к файлу
+         */
+        @Transactional(readOnly = true)
+        public FileAccessContext getFileAccessContext(UUID fileId, UUID userId) {
+                log.debug("Getting file access context: fileId={}, userId={}", fileId, userId);
+
+                File file = fileRepository.findById(fileId)
+                                .filter(f -> !f.isDeleted())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                String.format("File with id %s not found", fileId)));
+
+                FileAccessContext context = new FileAccessContext();
+                context.setFileId(fileId);
+                context.setUserId(userId);
+
+                // Проверяем, является ли пользователь владельцем
+                if (file.getUserId().equals(userId)) {
+                        context.setAccessType(AccessType.OWNER);
+                        context.setPermission("ALL");
+                        context.setCanRead(true);
+                        context.setCanWrite(true);
+                        context.setCanDelete(true);
+                        context.setCanShare(true);
+
+                        // Добавляем список существующих shares (только для владельца)
+                        List<FileShare> shares = shareRepository.findActiveSharesByFileId(fileId,
+                                        LocalDateTime.now());
+                        context.setExistingShares(shares);
+                } else {
+                        // Проверяем, есть ли share
+                        Optional<FileShare> shareOpt = shareRepository.findByFileIdAndSharedWithUserId(fileId, userId);
+
+                        if (shareOpt.isPresent() && shareOpt.get().isActive()) {
+                                FileShare share = shareOpt.get();
+
+                                // Проверяем, не истек ли share
+                                if (share.getExpiresAt() != null
+                                                && share.getExpiresAt().isBefore(LocalDateTime.now())) {
+                                        // Share истек
+                                        context.setAccessType(AccessType.NONE);
+                                        context.setPermission("");
+                                        context.setCanRead(false);
+                                        context.setCanWrite(false);
+                                        context.setCanDelete(false);
+                                        context.setCanShare(false);
+                                } else {
+                                        // Share активен
+                                        context.setAccessType(AccessType.SHARED);
+                                        context.setPermission(share.getPermission().name());
+                                        context.setCanRead(share.hasReadPermission());
+                                        context.setCanWrite(share.hasWritePermission());
+                                        context.setCanDelete(false); // Shared user никогда не может удалить
+                                        context.setCanShare(false); // Shared user не может расшаривать
+                                }
+                        } else {
+                                // Нет доступа
+                                context.setAccessType(AccessType.NONE);
+                                context.setPermission("");
+                                context.setCanRead(false);
+                                context.setCanWrite(false);
+                                context.setCanDelete(false);
+                                context.setCanShare(false);
+                        }
+                }
+
+                return context;
+        }
+
+        /**
+         * Проверка прав доступа (внутренний метод для использования в других сервисах)
+         * 
+         * @throws IllegalArgumentException если нет доступа
+         */
+        public void checkSharePermission(UUID fileId, UUID userId, SharePermission requiredPermission) {
+                log.debug("Checking share permission: fileId={}, userId={}, requiredPermission={}",
+                                fileId, userId, requiredPermission);
+
+                File file = fileRepository.findById(fileId)
+                                .filter(f -> !f.isDeleted())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                String.format("File with id %s not found", fileId)));
+
+                // Владелец имеет все права
+                if (file.getUserId().equals(userId)) {
+                        return;
+                }
+
+                // Проверяем share
+                FileShare share = shareRepository.findByFileIdAndSharedWithUserId(fileId, userId)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                String.format("Access denied: no share found for file %s and user %s",
+                                                                fileId, userId)));
+
+                // Проверяем активность
+                if (!share.isActive()) {
+                        throw new IllegalArgumentException("Share is not active");
+                }
+
+                // Проверяем срок действия
+                if (share.getExpiresAt() != null && share.getExpiresAt().isBefore(LocalDateTime.now())) {
+                        throw new IllegalArgumentException("Share has expired");
+                }
+
+                // Проверяем права
+                if (requiredPermission == SharePermission.WRITE && !share.hasWritePermission()) {
+                        throw new IllegalArgumentException(
+                                        String.format("Write permission required, but user has only %s",
+                                                        share.getPermission()));
+                }
+        }
+
+        /**
+         * Enum для типа доступа
+         */
+        public enum AccessType {
+                NONE, OWNER, SHARED
+        }
+
+        /**
+         * Класс для хранения контекста доступа к файлу
+         */
+        @lombok.Data
+        public static class FileAccessContext {
+                private UUID fileId;
+                private UUID userId;
+                private AccessType accessType;
+                private String permission;
+                private boolean canRead;
+                private boolean canWrite;
+                private boolean canDelete;
+                private boolean canShare;
+                private List<FileShare> existingShares;
         }
 }

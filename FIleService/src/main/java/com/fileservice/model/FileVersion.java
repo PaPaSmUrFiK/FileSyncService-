@@ -47,8 +47,12 @@ public class FileVersion {
         @Column(name = "created_at", nullable = false, updatable = false)
         private LocalDateTime createdAt;
 
-        @Column(name = "created_by", nullable = false)
-        private UUID createdBy;
+        /**
+         * User ID who created this version
+         * Can be the file owner or a shared user with WRITE permission
+         */
+        @Column(name = "created_by_user_id", nullable = false)
+        private UUID createdByUserId;
 
         public boolean isLatestVersion() {
                 return file != null && file.getVersion().equals(this.version);

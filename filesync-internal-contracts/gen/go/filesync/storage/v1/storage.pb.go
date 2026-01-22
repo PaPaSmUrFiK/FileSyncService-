@@ -321,6 +321,74 @@ func (x *ConfirmUploadRequest) GetHash() string {
 	return ""
 }
 
+type SaveVersionMetadataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`                // ID файла
+	Version       int32                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`                           // Версия
+	StoragePath   string                 `protobuf:"bytes,3,opt,name=storage_path,json=storagePath,proto3" json:"storage_path,omitempty"` // Путь в хранилище
+	Size          int64                  `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`                                 // Размер файла
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveVersionMetadataRequest) Reset() {
+	*x = SaveVersionMetadataRequest{}
+	mi := &file_filesync_storage_v1_storage_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveVersionMetadataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveVersionMetadataRequest) ProtoMessage() {}
+
+func (x *SaveVersionMetadataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_filesync_storage_v1_storage_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveVersionMetadataRequest.ProtoReflect.Descriptor instead.
+func (*SaveVersionMetadataRequest) Descriptor() ([]byte, []int) {
+	return file_filesync_storage_v1_storage_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SaveVersionMetadataRequest) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *SaveVersionMetadataRequest) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *SaveVersionMetadataRequest) GetStoragePath() string {
+	if x != nil {
+		return x.StoragePath
+	}
+	return ""
+}
+
+func (x *SaveVersionMetadataRequest) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
 type UrlResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                                                                                   // Presigned URL
@@ -333,7 +401,7 @@ type UrlResponse struct {
 
 func (x *UrlResponse) Reset() {
 	*x = UrlResponse{}
-	mi := &file_filesync_storage_v1_storage_proto_msgTypes[5]
+	mi := &file_filesync_storage_v1_storage_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -345,7 +413,7 @@ func (x *UrlResponse) String() string {
 func (*UrlResponse) ProtoMessage() {}
 
 func (x *UrlResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_filesync_storage_v1_storage_proto_msgTypes[5]
+	mi := &file_filesync_storage_v1_storage_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -358,7 +426,7 @@ func (x *UrlResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UrlResponse.ProtoReflect.Descriptor instead.
 func (*UrlResponse) Descriptor() ([]byte, []int) {
-	return file_filesync_storage_v1_storage_proto_rawDescGZIP(), []int{5}
+	return file_filesync_storage_v1_storage_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UrlResponse) GetUrl() string {
@@ -397,7 +465,7 @@ type EmptyResponse struct {
 
 func (x *EmptyResponse) Reset() {
 	*x = EmptyResponse{}
-	mi := &file_filesync_storage_v1_storage_proto_msgTypes[6]
+	mi := &file_filesync_storage_v1_storage_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -409,7 +477,7 @@ func (x *EmptyResponse) String() string {
 func (*EmptyResponse) ProtoMessage() {}
 
 func (x *EmptyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_filesync_storage_v1_storage_proto_msgTypes[6]
+	mi := &file_filesync_storage_v1_storage_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -422,7 +490,7 @@ func (x *EmptyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmptyResponse.ProtoReflect.Descriptor instead.
 func (*EmptyResponse) Descriptor() ([]byte, []int) {
-	return file_filesync_storage_v1_storage_proto_rawDescGZIP(), []int{6}
+	return file_filesync_storage_v1_storage_proto_rawDescGZIP(), []int{7}
 }
 
 var File_filesync_storage_v1_storage_proto protoreflect.FileDescriptor
@@ -453,7 +521,12 @@ const file_filesync_storage_v1_storage_proto_rawDesc = "" +
 	"\x14ConfirmUploadRequest\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x05R\aversion\x12\x12\n" +
-	"\x04hash\x18\x03 \x01(\tR\x04hash\"\xdb\x01\n" +
+	"\x04hash\x18\x03 \x01(\tR\x04hash\"\x86\x01\n" +
+	"\x1aSaveVersionMetadataRequest\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x05R\aversion\x12!\n" +
+	"\fstorage_path\x18\x03 \x01(\tR\vstoragePath\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x03R\x04size\"\xdb\x01\n" +
 	"\vUrlResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12\x1d\n" +
@@ -463,14 +536,15 @@ const file_filesync_storage_v1_storage_proto_rawDesc = "" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x0f\n" +
-	"\rEmptyResponse2\xd6\x03\n" +
+	"\rEmptyResponse2\xc2\x04\n" +
 	"\x0eStorageService\x12W\n" +
 	"\fGetUploadUrl\x12%.filesync.storage.v1.UploadUrlRequest\x1a .filesync.storage.v1.UrlResponse\x12[\n" +
 	"\x0eGetDownloadUrl\x12'.filesync.storage.v1.DownloadUrlRequest\x1a .filesync.storage.v1.UrlResponse\x12X\n" +
 	"\n" +
 	"DeleteFile\x12&.filesync.storage.v1.DeleteFileRequest\x1a\".filesync.storage.v1.EmptyResponse\x12T\n" +
 	"\bCopyFile\x12$.filesync.storage.v1.CopyFileRequest\x1a\".filesync.storage.v1.EmptyResponse\x12^\n" +
-	"\rConfirmUpload\x12).filesync.storage.v1.ConfirmUploadRequest\x1a\".filesync.storage.v1.EmptyResponseBjZhgithub.com/PaPaSmUrFiK/FileSyncService-/filesync-internal-contracts/gen/go/filesync/storage/v1;storagev1b\x06proto3"
+	"\rConfirmUpload\x12).filesync.storage.v1.ConfirmUploadRequest\x1a\".filesync.storage.v1.EmptyResponse\x12j\n" +
+	"\x13SaveVersionMetadata\x12/.filesync.storage.v1.SaveVersionMetadataRequest\x1a\".filesync.storage.v1.EmptyResponseBjZhgithub.com/PaPaSmUrFiK/FileSyncService-/filesync-internal-contracts/gen/go/filesync/storage/v1;storagev1b\x06proto3"
 
 var (
 	file_filesync_storage_v1_storage_proto_rawDescOnce sync.Once
@@ -484,31 +558,34 @@ func file_filesync_storage_v1_storage_proto_rawDescGZIP() []byte {
 	return file_filesync_storage_v1_storage_proto_rawDescData
 }
 
-var file_filesync_storage_v1_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_filesync_storage_v1_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_filesync_storage_v1_storage_proto_goTypes = []any{
-	(*UploadUrlRequest)(nil),     // 0: filesync.storage.v1.UploadUrlRequest
-	(*DownloadUrlRequest)(nil),   // 1: filesync.storage.v1.DownloadUrlRequest
-	(*DeleteFileRequest)(nil),    // 2: filesync.storage.v1.DeleteFileRequest
-	(*CopyFileRequest)(nil),      // 3: filesync.storage.v1.CopyFileRequest
-	(*ConfirmUploadRequest)(nil), // 4: filesync.storage.v1.ConfirmUploadRequest
-	(*UrlResponse)(nil),          // 5: filesync.storage.v1.UrlResponse
-	(*EmptyResponse)(nil),        // 6: filesync.storage.v1.EmptyResponse
-	nil,                          // 7: filesync.storage.v1.UrlResponse.HeadersEntry
+	(*UploadUrlRequest)(nil),           // 0: filesync.storage.v1.UploadUrlRequest
+	(*DownloadUrlRequest)(nil),         // 1: filesync.storage.v1.DownloadUrlRequest
+	(*DeleteFileRequest)(nil),          // 2: filesync.storage.v1.DeleteFileRequest
+	(*CopyFileRequest)(nil),            // 3: filesync.storage.v1.CopyFileRequest
+	(*ConfirmUploadRequest)(nil),       // 4: filesync.storage.v1.ConfirmUploadRequest
+	(*SaveVersionMetadataRequest)(nil), // 5: filesync.storage.v1.SaveVersionMetadataRequest
+	(*UrlResponse)(nil),                // 6: filesync.storage.v1.UrlResponse
+	(*EmptyResponse)(nil),              // 7: filesync.storage.v1.EmptyResponse
+	nil,                                // 8: filesync.storage.v1.UrlResponse.HeadersEntry
 }
 var file_filesync_storage_v1_storage_proto_depIdxs = []int32{
-	7, // 0: filesync.storage.v1.UrlResponse.headers:type_name -> filesync.storage.v1.UrlResponse.HeadersEntry
+	8, // 0: filesync.storage.v1.UrlResponse.headers:type_name -> filesync.storage.v1.UrlResponse.HeadersEntry
 	0, // 1: filesync.storage.v1.StorageService.GetUploadUrl:input_type -> filesync.storage.v1.UploadUrlRequest
 	1, // 2: filesync.storage.v1.StorageService.GetDownloadUrl:input_type -> filesync.storage.v1.DownloadUrlRequest
 	2, // 3: filesync.storage.v1.StorageService.DeleteFile:input_type -> filesync.storage.v1.DeleteFileRequest
 	3, // 4: filesync.storage.v1.StorageService.CopyFile:input_type -> filesync.storage.v1.CopyFileRequest
 	4, // 5: filesync.storage.v1.StorageService.ConfirmUpload:input_type -> filesync.storage.v1.ConfirmUploadRequest
-	5, // 6: filesync.storage.v1.StorageService.GetUploadUrl:output_type -> filesync.storage.v1.UrlResponse
-	5, // 7: filesync.storage.v1.StorageService.GetDownloadUrl:output_type -> filesync.storage.v1.UrlResponse
-	6, // 8: filesync.storage.v1.StorageService.DeleteFile:output_type -> filesync.storage.v1.EmptyResponse
-	6, // 9: filesync.storage.v1.StorageService.CopyFile:output_type -> filesync.storage.v1.EmptyResponse
-	6, // 10: filesync.storage.v1.StorageService.ConfirmUpload:output_type -> filesync.storage.v1.EmptyResponse
-	6, // [6:11] is the sub-list for method output_type
-	1, // [1:6] is the sub-list for method input_type
+	5, // 6: filesync.storage.v1.StorageService.SaveVersionMetadata:input_type -> filesync.storage.v1.SaveVersionMetadataRequest
+	6, // 7: filesync.storage.v1.StorageService.GetUploadUrl:output_type -> filesync.storage.v1.UrlResponse
+	6, // 8: filesync.storage.v1.StorageService.GetDownloadUrl:output_type -> filesync.storage.v1.UrlResponse
+	7, // 9: filesync.storage.v1.StorageService.DeleteFile:output_type -> filesync.storage.v1.EmptyResponse
+	7, // 10: filesync.storage.v1.StorageService.CopyFile:output_type -> filesync.storage.v1.EmptyResponse
+	7, // 11: filesync.storage.v1.StorageService.ConfirmUpload:output_type -> filesync.storage.v1.EmptyResponse
+	7, // 12: filesync.storage.v1.StorageService.SaveVersionMetadata:output_type -> filesync.storage.v1.EmptyResponse
+	7, // [7:13] is the sub-list for method output_type
+	1, // [1:7] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -527,7 +604,7 @@ func file_filesync_storage_v1_storage_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_filesync_storage_v1_storage_proto_rawDesc), len(file_filesync_storage_v1_storage_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

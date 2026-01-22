@@ -92,3 +92,13 @@ func (h *StorageHandler) ConfirmUpload(ctx context.Context, req *storagev1.Confi
 	}
 	return &storagev1.EmptyResponse{}, nil
 }
+
+func (h *StorageHandler) SaveVersionMetadata(ctx context.Context, req *storagev1.SaveVersionMetadataRequest) (*storagev1.EmptyResponse, error) {
+	const op = "grpc.StorageHandler.SaveVersionMetadata"
+
+	err := h.service.SaveVersionMetadata(ctx, req.FileId, req.Version, req.StoragePath, req.Size)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &storagev1.EmptyResponse{}, nil
+}

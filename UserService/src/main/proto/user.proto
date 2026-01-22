@@ -8,6 +8,7 @@ option java_multiple_files = true;
 service UserService {
   // Пользовательские функции
   rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc GetUserByEmail(GetUserByEmailRequest) returns (UserResponse);
   rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
   rpc DeleteUser(DeleteUserRequest) returns (EmptyResponse);
   rpc GetUserSettings(GetUserSettingsRequest) returns (SettingsResponse);
@@ -40,6 +41,10 @@ service UserService {
 // Базовые запросы
 message GetUserRequest {
   string user_id = 1;
+}
+
+message GetUserByEmailRequest {
+  string email = 1;
 }
 
 message UpdateUserRequest {
@@ -243,6 +248,10 @@ message UserStatsResponse {
   int32 business_users = 4;
   int32 enterprise_users = 5;
   repeated UsersByDate users_by_date = 6;
+  int32 new_users_last_24h = 7;
+  int32 active_users_last_hour = 8;
+  int32 blocked_users = 9;
+  int32 admin_count = 10;
 }
 
 message UsersByDate {

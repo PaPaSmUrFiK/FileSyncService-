@@ -5,17 +5,51 @@ package file;
 option java_multiple_files = true;
 option java_package = "com.fileservice.grpc";
 
+import "google/protobuf/empty.proto";
+
 service FileService {
+  // File operations
   rpc CreateFile(CreateFileRequest) returns (FileMetadata);
   rpc GetFile(GetFileRequest) returns (FileMetadata);
   rpc UpdateFile(UpdateFileRequest) returns (FileMetadata);
-  rpc DeleteFile(DeleteFileRequest) returns (EmptyResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (google.protobuf.Empty);
   rpc ListFiles(ListFilesRequest) returns (FileListResponse);
+  rpc MoveFile(MoveFileRequest) returns (FileMetadata);
+  
+  // Trash operations
+  rpc ListTrash(ListTrashRequest) returns (FileListResponse);
+  rpc RestoreFile(RestoreFileRequest) returns (google.protobuf.Empty);
+  rpc EmptyTrash(EmptyTrashRequest) returns (google.protobuf.Empty);
+  
+  // Sharing operations
   rpc ShareFile(ShareFileRequest) returns (ShareResponse);
+  rpc ListSharedWithMe(ListSharedWithMeRequest) returns (FileListResponse);
+  rpc ListMyShares(ListMySharesRequest) returns (ShareListResponse);
+  rpc RevokeShare(RevokeShareRequest) returns (google.protobuf.Empty);
+  rpc GetFileAccessContext(GetFileAccessContextRequest) returns (FileAccessContextResponse);
+  
+  // Version operations
+  rpc AddFileVersion(AddFileVersionRequest) returns (FileVersion);
   rpc GetFileVersions(GetVersionsRequest) returns (VersionListResponse);
   rpc RestoreVersion(RestoreVersionRequest) returns (FileMetadata);
+  
+  // Permission check
   rpc CheckPermission(CheckPermissionRequest) returns (PermissionResponse);
-  rpc MoveFile(MoveFileRequest) returns (FileMetadata);
+}
+
+message ListTrashRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message RestoreFileRequest {
+  string file_id = 1;
+  string user_id = 2;
+}
+
+message EmptyTrashRequest {
+  string user_id = 1;
 }
 
 message MoveFileRequest {
@@ -61,6 +95,7 @@ message ListFilesRequest {
   optional string parent_folder_id = 3;
   int32 limit = 4;
   int32 offset = 5;
+  optional string search_query = 6;
 }
 
 message ShareFileRequest {
@@ -101,6 +136,10 @@ message FileMetadata {
   string created_by = 11;
   string upload_url = 12;
   string download_url = 13;
+  string owner_email = 14;    // For UI - owner's email
+  string owner_name = 15;     // For UI - owner's name
+  string share_id = 16; // Optional: used when returning shared files to context
+  string permission = 17; // Optional: permission level for the user
 }
 
 
@@ -113,16 +152,20 @@ message ShareResponse {
   string share_id = 1;
   string file_id = 2;
   string shared_with_user_id = 3;
-  string permission = 4;
-  string created_at = 5;
+  string shared_with_email = 4; // For UI
+  string permission = 5;
+  string created_at = 6;
 }
 
 message FileVersion {
   int32 version = 1;
   int64 size = 2;
   string hash = 3;
-  string created_at = 4;
-  string created_by = 5;
+  string storage_path = 4;
+  string created_at = 5;
+  string created_by_user_id = 6;
+  string created_by_email = 7;    // For UI - avoids extra UserService calls
+  string created_by_name = 8;     // For UI - avoids extra UserService calls
 }
 
 message VersionListResponse {
@@ -132,6 +175,68 @@ message VersionListResponse {
 message PermissionResponse {
   bool has_permission = 1;
   string permission = 2;
+}
+
+// ========== NEW SHARING MESSAGES ==========
+
+message ListSharedWithMeRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message ListMySharesRequest {
+  string owner_id = 1;
+  optional string file_id = 2; // If specified, returns shares for specific file
+}
+
+message ShareListResponse {
+  repeated ShareInfo shares = 1;
+  int32 total = 2;
+}
+
+message ShareInfo {
+  string share_id = 1;
+  string file_id = 2;
+  string file_name = 3;
+  string shared_with_user_id = 4;
+  string shared_with_email = 5;
+  string permission = 6;
+  string created_at = 7;
+}
+
+message RevokeShareRequest {
+  string share_id = 1;
+  string owner_id = 2; // Only owner can revoke
+}
+
+message GetFileAccessContextRequest {
+  string file_id = 1;
+  string user_id = 2;
+}
+
+message FileAccessContextResponse {
+  enum AccessType {
+    NONE = 0;
+    OWNER = 1;
+    SHARED = 2;
+  }
+  
+  AccessType access_type = 1;
+  string permission = 2; // Empty if NONE, READ/WRITE if SHARED, ALL if OWNER
+  bool can_read = 3;
+  bool can_write = 4;
+  bool can_delete = 5;
+  bool can_share = 6;
+  repeated ShareInfo existing_shares = 7; // Only for OWNER
+}
+
+message AddFileVersionRequest {
+  string file_id = 1;
+  string user_id = 2; // Can be owner or shared user with WRITE permission
+  int64 size = 3;
+  string hash = 4;
+  string mime_type = 5;
 }
 
 message EmptyResponse {}

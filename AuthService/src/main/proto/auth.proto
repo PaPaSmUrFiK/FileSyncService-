@@ -16,6 +16,32 @@ service AuthService {
   rpc AssignRole(AssignRoleRequest) returns (EmptyResponse);
   rpc RevokeRole(RevokeRoleRequest) returns (EmptyResponse);
   rpc GetUserRoles(GetUserRolesRequest) returns (UserRolesResponse);
+  
+  // User blocking
+  rpc BlockUser(BlockUserRequest) returns (EmptyResponse);
+  rpc UnblockUser(UnblockUserRequest) returns (EmptyResponse);
+  
+  // Statistics
+  rpc GetActiveUsersCount(TimeRangeRequest) returns (CountResponse);
+  rpc GetUsersActiveInLastMinutes(TimeWindowRequest) returns (UserIdsResponse);
+  rpc GetAdminCount(GetAdminCountRequest) returns (CountResponse); // Added
+  rpc GetBlockedUsersCount(GetBlockedUsersCountRequest) returns (CountResponse);
+
+  // User deletion
+  rpc DeleteUser(DeleteUserRequest) returns (EmptyResponse);
+
+  // Password change
+  rpc ChangePassword(ChangePasswordRequest) returns (EmptyResponse);
+}
+
+message ChangePasswordRequest {
+  string user_id = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message DeleteUserRequest {
+  string user_id = 1;
 }
 
 message RegisterRequest {
@@ -80,5 +106,37 @@ message ValidationResponse {
 message UserRolesResponse {
   repeated string roles = 1;
 }
+
+// User blocking messages
+message BlockUserRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+
+message UnblockUserRequest {
+  string user_id = 1;
+}
+
+// Statistics messages
+message TimeRangeRequest {
+  int64 from_timestamp = 1;
+  int64 to_timestamp = 2;
+}
+
+message TimeWindowRequest {
+  int32 minutes = 1;
+}
+
+message CountResponse {
+  int32 count = 1;
+}
+
+message UserIdsResponse {
+  repeated string user_ids = 1;
+}
+
+message GetAdminCountRequest {}
+
+message GetBlockedUsersCountRequest {}
 
 message EmptyResponse {}

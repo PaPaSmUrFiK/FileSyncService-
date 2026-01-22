@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Folder, FileText, MoreVertical, Download, Edit, Trash, History, ChevronRight, Loader2, Plus, Upload } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Folder, FileText, Download, Edit, Trash, History, ChevronRight, Loader2, Plus, Upload, Share2, Check, X, Search } from 'lucide-react';
 import { CloudSyncButton } from '../components/CloudSyncButton';
-import { CloudSyncBadge } from '../components/CloudSyncBadge';
+
 import { CloudSyncCard } from '../components/CloudSyncCard';
 import { CloudSyncInput } from '../components/CloudSyncInput';
 import { cn } from '../components/ui/utils';
@@ -23,16 +23,21 @@ interface FileItem {
 
 export function FilesPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [files, setFiles] = useState<FileItem[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | undefined>(undefined);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id?: string; name: string }[]>([{ name: 'Мои файлы' }]);
   const [isLoading, setIsLoading] = useState(true);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
 
   // Modals
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [shareWithUserId, setShareWithUserId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // File upload refs
@@ -42,6 +47,61 @@ export function FilesPage() {
   // Update version refs
   const updateFileInputRef = useRef<HTMLInputElement>(null);
   const [fileToUpdate, setFileToUpdate] = useState<FileItem | null>(null);
+  const [fileToShare, setFileToShare] = useState<FileItem | null>(null);
+
+  // Renaming state
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const handleRenameClick = (file: FileItem) => {
+    setRenamingId(file.id);
+    setRenameValue(file.name);
+  };
+
+  const handleRenameSubmit = async () => {
+    if (!renamingId || !renameValue.trim()) return;
+
+    const file = files.find(f => f.id === renamingId);
+    if (!file) return;
+
+    if (file.name === renameValue) {
+      setRenamingId(null);
+      return;
+    }
+
+    try {
+      if (file.isFolder) {
+        await apiService.updateFolder(file.id, { name: renameValue });
+      } else {
+        await apiService.updateFile(file.id, { name: renameValue });
+      }
+      fetchFiles();
+    } catch (error) {
+      console.error('Error renaming:', error);
+      alert('Ошибка при переименовании');
+    } finally {
+      setRenamingId(null);
+    }
+  };
+
+  const handleShare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fileToShare || !shareWithUserId.trim()) return;
+
+    setIsProcessing(true);
+    try {
+      await apiService.shareFile(fileToShare.id, shareWithUserId);
+      setShowShareModal(false);
+      setShareWithUserId('');
+      setFileToShare(null);
+      alert('Файл успешно расшарен!');
+    } catch (error: any) {
+      console.error('Error sharing file:', error);
+      alert('Ошибка при предоставлении доступа: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const fetchFiles = async () => {
     setIsLoading(true);
@@ -185,7 +245,6 @@ export function FilesPage() {
 
   const handleUpdateVersionClick = (file: FileItem) => {
     setFileToUpdate(file);
-    setOpenMenuId(null);
     updateFileInputRef.current?.click();
   };
 
@@ -272,6 +331,11 @@ export function FilesPage() {
     }
   };
 
+  // Filter files locally based on search query
+  const filteredFiles = files.filter(file =>
+    file.name && file.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="p-8">
       {/* Hidden input for version updates */}
@@ -301,8 +365,21 @@ export function FilesPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-text-primary">Файлы</h1>
+      <div className="flex items-center justify-between mb-6 gap-4">
+        <h1 className="text-text-primary whitespace-nowrap">Файлы</h1>
+
+        {/* Search Input */}
+        <div className="flex-1 max-w-md relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+          <input
+            type="text"
+            placeholder="Поиск файлов..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-10 pr-4 rounded-xl bg-surface-1 border border-border-0 text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary"
+          />
+        </div>
+
         <div className="flex gap-3">
           <CloudSyncButton onClick={() => setShowUploadModal(true)}>
             <div className="flex items-center gap-2">
@@ -325,47 +402,85 @@ export function FilesPage() {
           <div className="absolute inset-0 flex items-center justify-center bg-surface-2/50 z-10">
             <Loader2 className="w-8 h-8 text-accent-primary animate-spin" />
           </div>
-        ) : files.length === 0 ? (
+        ) : filteredFiles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-text-muted">
             <Folder className="w-16 h-16 mb-4 opacity-20" />
-            <p>В этой папке пока ничего нет</p>
+            <p>{searchQuery ? 'Ничего не найдено' : 'В этой папке пока ничего нет'}</p>
+            {searchQuery && (
+              <p className="text-sm text-text-muted mt-2">Попробуйте изменить поисковый запрос</p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-surface-2 border-b border-border-0">
+                  <th className="w-10"></th>
                   <th className="text-left px-6 py-4 text-xs text-text-muted font-medium uppercase tracking-wider">Имя</th>
-                  <th className="text-left px-6 py-4 text-xs text-text-muted font-medium uppercase tracking-wider">Статус</th>
                   <th className="text-left px-6 py-4 text-xs text-text-muted font-medium uppercase tracking-wider">Размер</th>
                   <th className="text-left px-6 py-4 text-xs text-text-muted font-medium uppercase tracking-wider">Изменён</th>
                   <th className="text-left px-6 py-4 text-xs text-text-muted font-medium uppercase tracking-wider">Версия</th>
-                  <th className="w-12"></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {files.map((file) => (
+                {breadcrumbs.length > 1 && (
+                  <tr
+                    className="border-b border-border-0 hover:bg-accent-dark/5 transition-colors cursor-pointer"
+                    onClick={() => handleBreadcrumbClick(breadcrumbs.length - 2)}
+                  >
+                    <td className="px-6 py-4 w-10 text-center">
+                      <Folder className="w-5 h-5 text-accent-primary/70" />
+                    </td>
+                    <td className="px-6 py-4 text-text-primary font-medium">
+                      ..
+                    </td>
+                    <td className="px-6 py-4"></td>
+                    <td className="px-6 py-4"></td>
+                    <td className="px-6 py-4"></td>
+                    <td className="px-6 py-4"></td>
+                  </tr>
+                )}
+                {filteredFiles.map((file) => (
                   <tr
                     key={file.id}
                     className="border-b border-border-0 hover:bg-accent-dark/5 transition-colors group"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3 cursor-pointer" onClick={() => file.isFolder && handleFolderClick(file)}>
-                        {file.isFolder ? (
-                          <Folder className="w-5 h-5 text-accent-primary fill-accent-primary/20" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-text-muted" />
-                        )}
-                        <span className="text-text-primary group-hover:text-accent-primary transition-colors">
-                          {file.name}
-                        </span>
-                      </div>
+                    <td className="px-6 py-4 w-10 text-center">
+                      {file.isFolder ? (
+                        <Folder className="w-5 h-5 text-accent-primary fill-accent-primary/20" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-text-muted" />
+                      )}
                     </td>
                     <td className="px-6 py-4">
-                      {file.status === 'uploading' ? (
-                        <CloudSyncBadge variant="uploading">Загрузка {file.uploadProgress}%</CloudSyncBadge>
+                      {renamingId === file.id ? (
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameSubmit();
+                              if (e.key === 'Escape') setRenamingId(null);
+                            }}
+                            autoFocus
+                            className="bg-surface-1 border border-border-0 rounded px-2 py-1 text-text-primary text-sm w-full outline-none focus:ring-2 focus:ring-accent-primary"
+                          />
+                          <button onClick={handleRenameSubmit} className="p-1 hover:text-accent-primary"><Check className="w-4 h-4" /></button>
+                          <button onClick={() => setRenamingId(null)} className="p-1 hover:text-danger-bright"><X className="w-4 h-4" /></button>
+                        </div>
                       ) : (
-                        <CloudSyncBadge variant="synced">Синхронизировано</CloudSyncBadge>
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => file.isFolder && handleFolderClick(file)}>
+                          {file.isFolder ? (
+                            <Folder className="w-5 h-5 text-accent-primary fill-accent-primary/20" />
+                          ) : (
+                            <FileText className="w-5 h-5 text-text-muted" />
+                          )}
+                          <span className="text-text-primary group-hover:text-accent-primary transition-colors">
+                            {file.name}
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-text-secondary">
@@ -378,58 +493,53 @@ export function FilesPage() {
                       {file.isFolder ? '—' : `v${file.version}`}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {!file.isFolder && (
-                          <button
-                            onClick={() => navigate(`/history/${file.id}`)}
-                            className="p-2 hover:bg-surface-1 rounded-lg transition-colors text-text-muted hover:text-accent-primary"
-                            title="История версий"
-                          >
-                            <History className="w-5 h-5" />
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate(`/history/${file.id}`); }}
+                              className="p-2 hover:bg-surface-1 rounded-lg transition-colors text-text-secondary hover:text-accent-primary"
+                              title="История версий"
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDownload(file); }}
+                              className="p-2 hover:bg-surface-1 rounded-lg transition-colors text-text-secondary hover:text-accent-primary"
+                              title="Скачать"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleUpdateVersionClick(file); }}
+                              className="p-2 hover:bg-surface-1 rounded-lg transition-colors text-text-secondary hover:text-accent-primary"
+                              title="Загрузить новую версию"
+                            >
+                              <Upload className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
-                        <div className="relative">
-                          <button
-                            onClick={() => setOpenMenuId(openMenuId === file.id ? null : file.id)}
-                            className="p-2 hover:bg-surface-1 rounded-lg transition-colors"
-                          >
-                            <MoreVertical className="w-5 h-5 text-text-muted" />
-                          </button>
-
-                          {openMenuId === file.id && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
-                              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-2 border border-border-0 shadow-xl overflow-hidden z-50">
-                                {!file.isFolder && (
-                                  <>
-                                    <button
-                                      onClick={() => { handleDownload(file); setOpenMenuId(null); }}
-                                      className="w-full px-4 py-2.5 text-left text-sm text-text-secondary hover:bg-surface-1 transition-colors flex items-center gap-2"
-                                    >
-                                      <Download className="w-4 h-4" /> Скачать
-                                    </button>
-                                    <button
-                                      onClick={() => handleUpdateVersionClick(file)}
-                                      className="w-full px-4 py-2.5 text-left text-sm text-text-secondary hover:bg-surface-1 transition-colors flex items-center gap-2"
-                                    >
-                                      <Upload className="w-4 h-4" /> Загрузить новую версию
-                                    </button>
-                                  </>
-                                )}
-                                <button className="w-full px-4 py-2.5 text-left text-sm text-text-secondary hover:bg-surface-1 transition-colors flex items-center gap-2">
-                                  <Edit className="w-4 h-4" /> Переименовать
-                                </button>
-                                <div className="border-t border-border-0" />
-                                <button
-                                  onClick={() => { handleDelete(file.id, file.isFolder); setOpenMenuId(null); }}
-                                  className="w-full px-4 py-2.5 text-left text-sm text-danger-bright hover:bg-danger-bright/10 transition-colors flex items-center gap-2"
-                                >
-                                  <Trash className="w-4 h-4" /> Удалить
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setFileToShare(file); setShowShareModal(true); }}
+                          className="p-2 hover:bg-surface-1 rounded-lg transition-colors text-text-secondary hover:text-accent-primary"
+                          title="Поделиться"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRenameClick(file); }}
+                          className="p-2 hover:bg-surface-1 rounded-lg transition-colors text-text-secondary hover:text-accent-primary"
+                          title="Переименовать"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDelete(file.id, file.isFolder); }}
+                          className="p-2 hover:bg-danger-bright/10 rounded-lg transition-colors text-text-secondary hover:text-danger-bright"
+                          title="Удалить"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -437,6 +547,7 @@ export function FilesPage() {
               </tbody>
             </table>
           </div>
+
         )}
       </CloudSyncCard>
 
@@ -529,6 +640,48 @@ export function FilesPage() {
                 disabled={!newFolderName.trim() || isProcessing}
               >
                 {isProcessing ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Создать'}
+              </CloudSyncButton>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-bg-0/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <form onSubmit={handleShare} className="w-full max-w-md rounded-[24px] bg-surface-2 border border-border-0 p-8 shadow-2xl">
+            <h3 className="text-xl font-semibold text-text-primary mb-2">Поделиться</h3>
+            <p className="text-sm text-text-muted mb-6">Предоставить доступ к файлу "{fileToShare?.name}"</p>
+
+            <div className="mb-8">
+              <CloudSyncInput
+                label="ID пользователя или Email"
+                placeholder="Введите ID пользователя"
+                value={shareWithUserId}
+                onChange={(e) => setShareWithUserId(e.target.value)}
+                autoFocus
+                required
+              />
+              <p className="text-[10px] text-text-muted mt-2 px-1">
+                Для предоставления доступа введите UUID пользователя, с которым хотите поделиться файлом.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <CloudSyncButton
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => { setShowShareModal(false); setShareWithUserId(''); }}
+                disabled={isProcessing}
+              >
+                Отмена
+              </CloudSyncButton>
+              <CloudSyncButton
+                type="submit"
+                className="flex-1"
+                disabled={!shareWithUserId.trim() || isProcessing}
+              >
+                {isProcessing ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Поделиться'}
               </CloudSyncButton>
             </div>
           </form>

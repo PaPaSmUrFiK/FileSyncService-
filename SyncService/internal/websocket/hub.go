@@ -10,21 +10,32 @@ import (
 )
 
 type Hub struct {
-	clients    map[uuid.UUID]*Client
+	// Registered clients, map UserID -> list of clients (to support multiple connections/tabs)
+	clients    map[uuid.UUID]map[*Client]bool
 	register   chan *Client
 	unregister chan *Client
-	broadcast  chan []byte
-	mu         sync.RWMutex
-	logger     *slog.Logger
+	broadcast  chan []byte // Broadcast to all connected users (optional)
+
+	// Channel for sending message to specific users
+	userMessages chan *UserMessage
+
+	mu     sync.RWMutex
+	logger *slog.Logger
+}
+
+type UserMessage struct {
+	UserID  uuid.UUID
+	Payload []byte
 }
 
 func NewHub(logger *slog.Logger) *Hub {
 	return &Hub{
-		clients:    make(map[uuid.UUID]*Client),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan []byte),
-		logger:     logger,
+		clients:      make(map[uuid.UUID]map[*Client]bool),
+		register:     make(chan *Client),
+		unregister:   make(chan *Client),
+		broadcast:    make(chan []byte),
+		userMessages: make(chan *UserMessage),
+		logger:       logger,
 	}
 }
 
@@ -33,27 +44,54 @@ func (h *Hub) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
 		case client := <-h.register:
 			h.mu.Lock()
-			h.clients[client.DeviceID] = client
+			if h.clients[client.UserID] == nil {
+				h.clients[client.UserID] = make(map[*Client]bool)
+			}
+			h.clients[client.UserID][client] = true
 			h.mu.Unlock()
-			h.logger.Debug("устройство подключено", slog.String("device_id", client.DeviceID.String()))
+			h.logger.Debug("client connected", slog.String("user_id", client.UserID.String()))
+
 		case client := <-h.unregister:
 			h.mu.Lock()
-			if _, ok := h.clients[client.DeviceID]; ok {
-				delete(h.clients, client.DeviceID)
-				close(client.send)
-				h.logger.Debug("устройство отключено", slog.String("device_id", client.DeviceID.String()))
+			if userClients, ok := h.clients[client.UserID]; ok {
+				if _, ok := userClients[client]; ok {
+					delete(userClients, client)
+					close(client.send)
+				}
+				if len(userClients) == 0 {
+					delete(h.clients, client.UserID)
+				}
 			}
 			h.mu.Unlock()
+			h.logger.Debug("client disconnected", slog.String("user_id", client.UserID.String()))
+
 		case message := <-h.broadcast:
 			h.mu.RLock()
-			for _, client := range h.clients {
-				select {
-				case client.send <- message:
-				default:
-					h.logger.Warn("буфер клиента переполнен, отключаем", slog.String("device_id", client.DeviceID.String()))
-					// We can't safely unregister here, would depend on implementation
+			for _, userClients := range h.clients {
+				for client := range userClients {
+					select {
+					case client.send <- message:
+					default:
+						// Buffer full, close connection (or just skip)
+						// For now, skipping to avoid blocking Hub
+						h.logger.Warn("client buffer full, skipping broadcast message", slog.String("user_id", client.UserID.String()))
+					}
+				}
+			}
+			h.mu.RUnlock()
+
+		case userMsg := <-h.userMessages:
+			h.mu.RLock()
+			if userClients, ok := h.clients[userMsg.UserID]; ok {
+				for client := range userClients {
+					select {
+					case client.send <- userMsg.Payload:
+					default:
+						h.logger.Warn("client buffer full, skipping user message", slog.String("user_id", userMsg.UserID.String()))
+					}
 				}
 			}
 			h.mu.RUnlock()
@@ -61,24 +99,17 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 }
 
-func (h *Hub) NotifyDevice(deviceID uuid.UUID, event interface{}) {
-	h.mu.RLock()
-	client, ok := h.clients[deviceID]
-	h.mu.RUnlock()
-
-	if !ok {
-		return
-	}
-
-	payload, err := json.Marshal(event)
+// BroadcastToUser sends a JSON payload to a specific user
+func (h *Hub) BroadcastToUser(userID uuid.UUID, payload interface{}) {
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		h.logger.Error("ошибка маршалинга уведомления", slog.Any("error", err))
+		h.logger.Error("failed to marshal payload", slog.Any("error", err))
 		return
 	}
 
 	select {
-	case client.send <- payload:
+	case h.userMessages <- &UserMessage{UserID: userID, Payload: jsonPayload}:
 	default:
-		h.logger.Warn("не удалось отправить уведомление, буфер полон", slog.String("device_id", deviceID.String()))
+		h.logger.Warn("userMessages channel full, dropping message", slog.String("user_id", userID.String()))
 	}
 }

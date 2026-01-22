@@ -1,6 +1,5 @@
 package com.fileservice.repository;
 
-
 import com.fileservice.model.FileShare;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,36 +16,46 @@ import java.util.UUID;
 @Repository
 public interface FileShareRepository extends JpaRepository<FileShare, UUID> {
 
-    Optional<FileShare> findByFileIdAndSharedWithUserId(UUID fileId, UUID sharedWithUserId);
+        Optional<FileShare> findByFileIdAndSharedWithUserId(UUID fileId, UUID sharedWithUserId);
 
-    List<FileShare> findByFileId(UUID fileId);
+        List<FileShare> findByFileId(UUID fileId);
 
-    @Query("SELECT fs FROM FileShare fs WHERE fs.file.id = :fileId " +
-            "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
-    List<FileShare> findActiveSharesByFileId(@Param("fileId") UUID fileId,
-                                             @Param("now") LocalDateTime now);
+        @Query("SELECT fs FROM FileShare fs WHERE fs.file.id = :fileId " +
+                        "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
+        List<FileShare> findActiveSharesByFileId(@Param("fileId") UUID fileId,
+                        @Param("now") LocalDateTime now);
 
-    @Query("SELECT fs FROM FileShare fs WHERE fs.sharedWithUserId = :userId " +
-            "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
-    Page<FileShare> findActiveSharesForUser(@Param("userId") UUID userId,
-                                            @Param("now") LocalDateTime now,
-                                            Pageable pageable);
+        // Query to get share IDs with pagination (no JOIN FETCH to avoid count query
+        // issues)
+        @Query("SELECT fs.id FROM FileShare fs JOIN fs.file f WHERE fs.sharedWithUserId = :userId " +
+                        "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now) " +
+                        "AND f.isDeleted = false")
+        Page<UUID> findActiveShareIdsForUser(@Param("userId") UUID userId,
+                        @Param("now") LocalDateTime now,
+                        Pageable pageable);
 
-    Page<FileShare> findByOwnerId(UUID ownerId, Pageable pageable);
+        // Query to fetch full shares with files by IDs
+        @Query("SELECT fs FROM FileShare fs JOIN FETCH fs.file WHERE fs.id IN :shareIds")
+        List<FileShare> findByIdInWithFile(@Param("shareIds") List<UUID> shareIds);
 
-    @Query("SELECT COUNT(fs) FROM FileShare fs WHERE fs.file.id = :fileId " +
-            "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
-    long countActiveShares(@Param("fileId") UUID fileId, @Param("now") LocalDateTime now);
+        @Query("SELECT COUNT(fs) FROM FileShare fs WHERE fs.file.id = :fileId " +
+                        "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
+        long countActiveShares(@Param("fileId") UUID fileId, @Param("now") LocalDateTime now);
 
-    @Query("SELECT CASE WHEN COUNT(fs) > 0 THEN true ELSE false END " +
-            "FROM FileShare fs WHERE fs.file.id = :fileId " +
-            "AND fs.sharedWithUserId = :userId " +
-            "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
-    boolean existsActiveShare(@Param("fileId") UUID fileId,
-                              @Param("userId") UUID userId,
-                              @Param("now") LocalDateTime now);
+        @Query("SELECT CASE WHEN COUNT(fs) > 0 THEN true ELSE false END " +
+                        "FROM FileShare fs WHERE fs.file.id = :fileId " +
+                        "AND fs.sharedWithUserId = :userId " +
+                        "AND (fs.expiresAt IS NULL OR fs.expiresAt > :now)")
+        boolean existsActiveShare(@Param("fileId") UUID fileId,
+                        @Param("userId") UUID userId,
+                        @Param("now") LocalDateTime now);
 
-    @Query("SELECT fs FROM FileShare fs WHERE fs.expiresAt IS NOT NULL " +
-            "AND fs.expiresAt < :now")
-    List<FileShare> findExpiredShares(@Param("now") LocalDateTime now);
+        @Query("SELECT fs FROM FileShare fs WHERE fs.expiresAt IS NOT NULL " +
+                        "AND fs.expiresAt < :now")
+        List<FileShare> findExpiredShares(@Param("now") LocalDateTime now);
+
+        /**
+         * Найти все shares для списка файлов
+         */
+        List<FileShare> findByFileIdIn(List<UUID> fileIds);
 }

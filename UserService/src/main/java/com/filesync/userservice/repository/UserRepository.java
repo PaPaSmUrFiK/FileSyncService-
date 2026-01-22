@@ -15,32 +15,35 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
-    boolean existsByEmail(String email);
+        boolean existsByEmail(String email);
 
-    // Dynamic stats queries
+        java.util.Optional<User> findByEmail(String email);
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt <= :date")
-    long countUsersCreatedBefore(@Param("date") LocalDateTime date);
+        long countByIsBlocked(Boolean isBlocked);
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :start AND :end")
-    long countUsersRegisteredBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+        // Dynamic stats queries
 
-    @Query("SELECT SUM(u.storageUsed) FROM User u")
-    Long getTotalStorageUsed();
+        @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt <= :date")
+        long countUsersCreatedBefore(@Param("date") LocalDateTime date);
 
-    @Query("SELECT SUM(u.storageQuota) FROM User u")
-    Long getTotalStorageAllocated();
+        @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :start AND :end")
+        long countUsersRegisteredBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT u FROM User u ORDER BY u.storageUsed DESC")
-    List<User> findTopUsersByStorage(Pageable pageable);
+        @Query("SELECT SUM(u.storageUsed) FROM User u")
+        Long getTotalStorageUsed();
 
-    // Search for admin list
-    @Query("SELECT u FROM User u WHERE " +
-            "(:search IS NULL OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%'))) "
-            +
-            "AND (:plan IS NULL OR EXISTS (SELECT q FROM UserQuota q WHERE q.user = u AND q.planType = :plan))")
-    Page<User> findAllWithFilters(@Param("search") String search, @Param("plan") String plan, Pageable pageable);
+        @Query("SELECT SUM(u.storageQuota) FROM User u")
+        Long getTotalStorageAllocated();
 
-    @Query("SELECT DATE(u.createdAt) as date, COUNT(u) as count FROM User u WHERE u.createdAt >= :fromDate GROUP BY DATE(u.createdAt) ORDER BY date")
-    List<Object[]> getRegistrationDynamics(@Param("fromDate") LocalDateTime fromDate);
+        @Query("SELECT u FROM User u ORDER BY u.storageUsed DESC")
+        List<User> findTopUsersByStorage(Pageable pageable);
+
+        // Search for admin list
+        @Query("SELECT u FROM User u WHERE " +
+                        "(:search IS NULL OR LOWER(u.email) LIKE :search OR LOWER(u.name) LIKE :search) " +
+                        "AND (:plan IS NULL OR u.plan = :plan)")
+        Page<User> findAllWithFilters(@Param("search") String search, @Param("plan") String plan, Pageable pageable);
+
+        @Query("SELECT DATE(u.createdAt) as date, COUNT(u) as count FROM User u WHERE u.createdAt >= :fromDate GROUP BY DATE(u.createdAt) ORDER BY date")
+        List<Object[]> getRegistrationDynamics(@Param("fromDate") LocalDateTime fromDate);
 }

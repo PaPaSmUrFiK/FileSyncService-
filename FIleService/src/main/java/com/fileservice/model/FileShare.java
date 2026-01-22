@@ -32,9 +32,6 @@ public class FileShare {
     @JoinColumn(name = "file_id", nullable = false)
     private File file;
 
-    @Column(name = "owner_id", nullable = false)
-    private UUID ownerId;
-
     @Column(name = "shared_with_user_id", nullable = false)
     private UUID sharedWithUserId;
 
@@ -46,22 +43,44 @@ public class FileShare {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * User ID who created this share (typically the file owner)
+     * Used for audit purposes
+     */
+    @Column(name = "created_by", nullable = false)
+    private UUID createdBy;
+
+    /**
+     * Expiration date for the share (optional)
+     */
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
-    public boolean isActive() {
-        return expiresAt == null || expiresAt.isAfter(LocalDateTime.now());
-    }
+    /**
+     * Whether the share is active
+     */
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private boolean isActive = true;
 
+    // Helper methods
     public boolean hasReadPermission() {
-        return isActive() && permission.canRead();
+        return permission.canRead();
     }
 
     public boolean hasWritePermission() {
-        return isActive() && permission.canWrite();
+        return permission.canWrite();
     }
 
     public boolean hasAdminPermission() {
-        return isActive() && permission.canAdmin();
+        return permission.canAdmin();
+    }
+
+    /**
+     * Get owner ID from the associated file
+     * Source of truth is file.userId, not duplicated here
+     */
+    public UUID getOwnerId() {
+        return file != null ? file.getUserId() : null;
     }
 }

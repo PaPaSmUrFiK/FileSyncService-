@@ -8,11 +8,11 @@ import (
 )
 
 type Config struct {
-	Env      string         `yaml:"env" env:"ENV" env-default:"local"`
-	GRPC     GRPCConfig     `yaml:"grpc"`
-	HTTP     HTTPConfig     `yaml:"http"`
-	Postgres PostgresConfig `yaml:"postgres"`
-	Kafka    KafkaConfig    `yaml:"kafka"`
+	Env       string      `yaml:"env" env:"ENV" env-default:"local"`
+	GRPC      GRPCConfig  `yaml:"grpc"`
+	HTTP      HTTPConfig  `yaml:"http"`
+	Kafka     KafkaConfig `yaml:"kafka"`
+	JWTSecret string      `yaml:"jwt_secret" env:"JWT_SECRET" env-required:"true"`
 }
 
 type GRPCConfig struct {
@@ -23,10 +23,6 @@ type HTTPConfig struct {
 	Port int `yaml:"port" env:"HTTP_PORT" env-default:"8084"`
 }
 
-type PostgresConfig struct {
-	URL string `yaml:"url" env:"DB_URL" env-required:"true"`
-}
-
 type KafkaConfig struct {
 	Brokers       []string    `yaml:"brokers" env:"KAFKA_BROKERS" env-separator:","`
 	ConsumerGroup string      `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP" env-default:"sync-service"`
@@ -34,9 +30,8 @@ type KafkaConfig struct {
 }
 
 type KafkaTopics struct {
-	FileEvents    string `yaml:"file_events" env:"KAFKA_TOPIC_FILE_EVENTS" env-default:"file.events"`
-	StorageEvents string `yaml:"storage_events" env:"KAFKA_TOPIC_STORAGE_EVENTS" env-default:"storage.events"`
-	SyncEvents    string `yaml:"sync_events" env:"KAFKA_TOPIC_SYNC_EVENTS" env-default:"sync.events"`
+	FileEvents        string `yaml:"file_events" env:"KAFKA_TOPIC_FILE_EVENTS" env-default:"file.events"`
+	SyncNotifications string `yaml:"sync_notifications" env:"KAFKA_TOPIC_SYNC_NOTIFICATIONS" env-default:"sync-notifications"`
 }
 
 func MustLoad() *Config {

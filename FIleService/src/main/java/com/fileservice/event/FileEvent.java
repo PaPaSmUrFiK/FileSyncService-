@@ -20,4 +20,5 @@ public class FileEvent {
     private LocalDateTime timestamp;
     private Object payload; // Flexible payload (could be file metadata, version info, etc.)
     private int version; // Event schema version
+    private java.util.Map<String, String> metadata; // Extra metadata
 }

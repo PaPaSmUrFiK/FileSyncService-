@@ -21,7 +21,8 @@ import org.springframework.http.HttpStatus;
 
 /**
  * Глобальный фильтр аутентификации для WebFlux.
- * Применяется ко всем запросам, включая те, что обрабатываются локальными контроллерами.
+ * Применяется ко всем запросам, включая те, что обрабатываются локальными
+ * контроллерами.
  */
 @Component
 @Order(-10) // Должен выполняться после CorsWebFilter (у которого Order.HIGHEST_PRECEDENCE)
@@ -38,8 +39,8 @@ public class GlobalAuthenticationWebFilter implements WebFilter {
             "/api/v1/auth/refresh",
             "/api/v1/auth/validate",
             "/api/v1/storage/minio/", // Pre-signed URL от MinIO уже содержат подпись
-            "/fallback"
-    );
+            "/actuator/", // Health checks and metrics
+            "/fallback");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -70,9 +71,15 @@ public class GlobalAuthenticationWebFilter implements WebFilter {
         // Проверяем наличие заголовка Authorization
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            // Если пути начинаются с /api/v1/, но не в списке публичных - требуем авторизацию
+            // Если пути начинаются с /api/v1/, но не в списке публичных - требуем
+            // авторизацию
             if (path.startsWith("/api/v1/")) {
-                log.warn("Missing or invalid Authorization header for path: {}", path);
+                // Reduce log spam for quota endpoint that frontend polls
+                if (path.contains("/quota")) {
+                    log.debug("Missing or invalid Authorization header for path: {}", path);
+                } else {
+                    log.warn("Missing or invalid Authorization header for path: {}", path);
+                }
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
@@ -80,7 +87,8 @@ public class GlobalAuthenticationWebFilter implements WebFilter {
         }
 
         String token = authHeader.substring(7);
-        log.debug("Validating token for path: {}, token prefix: {}...", path, token.length() > 10 ? token.substring(0, 10) : "short");
+        log.debug("Validating token for path: {}, token prefix: {}...", path,
+                token.length() > 10 ? token.substring(0, 10) : "short");
 
         return authServiceClient.validateToken(token)
                 .flatMap(validationResponse -> {
@@ -115,4 +123,3 @@ public class GlobalAuthenticationWebFilter implements WebFilter {
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
 }
-

@@ -75,6 +75,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
@@ -83,10 +84,11 @@ services:
     networks:
       - filesync-network
     healthcheck:
-      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      test: [ "CMD-SHELL", "cub kafka-ready -b localhost:9092 1 20 || exit 1" ]
       interval: 10s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   minio:
     image: minio/minio:latest
@@ -119,13 +121,7 @@ services:
     networks:
       - filesync-network
     entrypoint: >
-      /bin/sh -c " mc alias set myminio http://minio:9000 minioadmin minioadmin; mc mb --ignore-existing myminio/file-sync-storage; mc anonymous set public myminio/file-sync-storage;
-
-      # Создаем файл конфигурации CORS echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?><CORSConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>PUT</AllowedMethod><AllowedMethod>POST</AllowedMethod><AllowedMethod>GET</AllowedMethod><AllowedMethod>DELETE</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader></CORSRule></CORSConfiguration>' > /tmp/cors.xml;
-
-      # Применяем CORS к бакету mc cors set myminio/file-sync-storage /tmp/cors.xml;
-
-      echo 'MinIO setup completed successfully'; exit 0; "
+      /bin/sh -c " mc alias set myminio http://minio:9000 minioadmin minioadmin; mc mb --ignore-existing myminio/file-sync-storage; mc anonymous set public myminio/file-sync-storage; echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?><CORSConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>PUT</AllowedMethod><AllowedMethod>POST</AllowedMethod><AllowedMethod>GET</AllowedMethod><AllowedMethod>DELETE</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader></CORSRule></CORSConfiguration>' > /tmp/cors.xml; mc cors set myminio/file-sync-storage /tmp/cors.xml; echo 'MinIO setup completed successfully'; exit 0; "
 
   consul:
     image: hashicorp/consul:1.15
@@ -142,16 +138,6 @@ services:
       timeout: 5s
       retries: 5
 
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: filesync-mailpit
-    ports:
-      - "8025:8025"
-      - "1025:1025"
-    networks:
-      - filesync-network
-    restart: unless-stopped
-
   # =========================
   # MIGRATORS (BEFORE SERVICES)
   # =========================
@@ -162,18 +148,6 @@ services:
       dockerfile: StorageService/Dockerfile
     container_name: filesync-storage-migrator
     command: ./migrator --db-url="postgres://filesync:secret@postgres:5432/storage_db?sslmode=disable" --migrations-path=./migrations
-    depends_on:
-      db-init:
-        condition: service_completed_successfully
-    networks:
-      - filesync-network
-
-  sync-migrator:
-    build:
-      context: .
-      dockerfile: SyncService/Dockerfile
-    container_name: filesync-sync-migrator
-    command: ./migrator --db-url="postgres://filesync:secret@postgres:5432/sync_db?sslmode=disable" --migrations-path=./migrations
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -253,33 +227,33 @@ services:
       - filesync-network
     restart: unless-stopped
 
-  file-service:
-    build:
-      context: ./FIleService
-      dockerfile: Dockerfile
-    container_name: filesync-file-service
-    ports:
-      - "8083:8083"
-      - "9093:9093"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      CONSUL_HOST: consul
-      AUTH_SERVICE_HOST: auth-service
-      AUTH_SERVICE_PORT: 9091
-      USER_SERVICE_HOST: user-service
-      USER_SERVICE_PORT: 9090
-      STORAGE_SERVICE_HOST: storage-service
-      STORAGE_SERVICE_PORT: 9094
-    depends_on:
-      db-init:
-        condition: service_completed_successfully
-      user-service:
-        condition: service_started
-      storage-service:
-        condition: service_started
-    networks:
-      - filesync-network
-    restart: unless-stopped
+  # file-service:
+  #   build:
+  #     context: ./FIleService
+  #     dockerfile: Dockerfile
+  #   container_name: filesync-file-service
+  #   ports:
+  #     - "8083:8083"
+  #     - "9093:9093"
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: docker
+  #     CONSUL_HOST: consul
+  #     AUTH_SERVICE_HOST: auth-service
+  #     AUTH_SERVICE_PORT: 9091
+  #     USER_SERVICE_HOST: user-service
+  #     USER_SERVICE_PORT: 9090
+  #     STORAGE_SERVICE_HOST: storage-service
+  #     STORAGE_SERVICE_PORT: 9094
+  #   depends_on:
+  #     db-init:
+  #       condition: service_completed_successfully
+  #     user-service:
+  #       condition: service_started
+  #     storage-service:
+  #       condition: service_started
+  #   networks:
+  #     - filesync-network
+  #   restart: unless-stopped
 
   sync-service:
     build:
@@ -288,15 +262,11 @@ services:
     container_name: filesync-sync-service
     ports:
       - "8084:8084"
-      - "9095:9095"
     environment:
-      - DB_URL=postgres://filesync:secret@postgres:5432/sync_db?sslmode=disable
       - KAFKA_BROKERS=kafka:29092
-      - GRPC_PORT=9095
       - HTTP_PORT=8084
+      - JWT_SECRET=q9hFqkz+KQx9nM2yC3g2zKcXrKxF3K0M+Zp+uF4ZxN8=
     depends_on:
-      sync-migrator:
-        condition: service_completed_successfully
       kafka:
         condition: service_healthy
     networks:
@@ -314,15 +284,11 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       CONSUL_HOST: consul
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
     depends_on:
       db-init:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
-      mailpit:
-        condition: service_started
     networks:
       - filesync-network
     restart: unless-stopped
@@ -359,8 +325,8 @@ services:
         condition: service_started
       user-service:
         condition: service_started
-      file-service:
-        condition: service_started
+      # file-service:
+      #   condition: service_started
       storage-service:
         condition: service_started
       sync-service:

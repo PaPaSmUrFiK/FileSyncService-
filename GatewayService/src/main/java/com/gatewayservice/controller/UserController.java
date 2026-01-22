@@ -50,7 +50,7 @@ public class UserController {
         log.info("Update user request for userId: {}", userId);
         String name = requestBody.containsKey("name") ? (String) requestBody.get("name") : null;
         String avatarUrl = requestBody.containsKey("avatarUrl") ? (String) requestBody.get("avatarUrl") : null;
-        
+
         return userServiceClient.updateUser(userId, name, avatarUrl)
                 .map(response -> {
                     try {
@@ -73,7 +73,7 @@ public class UserController {
     @DeleteMapping
     public Mono<ResponseEntity<Object>> deleteUser(@RequestHeader("X-User-Id") String userId) {
         log.info("Delete user request for userId: {}", userId);
-        return userServiceClient.deleteUser(userId)
+        return userServiceClient.deleteUser(userId, userId)
                 .then(Mono.just(ResponseEntity.noContent().build()))
                 .onErrorResume(e -> {
                     log.error("Delete user error: {}", e.getMessage());
@@ -109,18 +109,22 @@ public class UserController {
             @RequestHeader("X-User-Id") String userId,
             @RequestBody Map<String, Object> requestBody) {
         log.info("Update user settings request for userId: {}", userId);
-        
+
         String theme = requestBody.containsKey("theme") ? (String) requestBody.get("theme") : null;
         String language = requestBody.containsKey("language") ? (String) requestBody.get("language") : null;
-        Boolean notificationsEnabled = requestBody.containsKey("notificationsEnabled") 
-                ? (Boolean) requestBody.get("notificationsEnabled") : null;
-        Boolean emailNotifications = requestBody.containsKey("emailNotifications") 
-                ? (Boolean) requestBody.get("emailNotifications") : null;
-        Boolean autoSync = requestBody.containsKey("autoSync") 
-                ? (Boolean) requestBody.get("autoSync") : null;
-        Boolean syncOnMobileData = requestBody.containsKey("syncOnMobileData") 
-                ? (Boolean) requestBody.get("syncOnMobileData") : null;
-        
+        Boolean notificationsEnabled = requestBody.containsKey("notificationsEnabled")
+                ? (Boolean) requestBody.get("notificationsEnabled")
+                : null;
+        Boolean emailNotifications = requestBody.containsKey("emailNotifications")
+                ? (Boolean) requestBody.get("emailNotifications")
+                : null;
+        Boolean autoSync = requestBody.containsKey("autoSync")
+                ? (Boolean) requestBody.get("autoSync")
+                : null;
+        Boolean syncOnMobileData = requestBody.containsKey("syncOnMobileData")
+                ? (Boolean) requestBody.get("syncOnMobileData")
+                : null;
+
         return userServiceClient.updateUserSettings(userId, theme, language, notificationsEnabled,
                 emailNotifications, autoSync, syncOnMobileData)
                 .map(response -> {
@@ -175,8 +179,7 @@ public class UserController {
                 "storageUsed", response.getStorageUsed(),
                 "storageQuota", response.getStorageQuota(),
                 "createdAt", response.getCreatedAt(),
-                "updatedAt", response.getUpdatedAt()
-        );
+                "updatedAt", response.getUpdatedAt());
         return objectMapper.writeValueAsString(json);
     }
 
@@ -188,8 +191,7 @@ public class UserController {
                 "notificationsEnabled", response.getNotificationsEnabled(),
                 "emailNotifications", response.getEmailNotifications(),
                 "autoSync", response.getAutoSync(),
-                "syncOnMobileData", response.getSyncOnMobileData()
-        );
+                "syncOnMobileData", response.getSyncOnMobileData());
         return objectMapper.writeValueAsString(json);
     }
 
@@ -198,9 +200,7 @@ public class UserController {
                 "hasSpace", response.getHasSpace(),
                 "availableSpace", response.getAvailableSpace(),
                 "storageUsed", response.getStorageUsed(),
-                "storageQuota", response.getStorageQuota()
-        );
+                "storageQuota", response.getStorageQuota());
         return objectMapper.writeValueAsString(json);
     }
 }
-

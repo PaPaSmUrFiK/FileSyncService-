@@ -32,6 +32,12 @@ public class Notification {
 
     private Json data;
 
+    @Column("resource_id")
+    private UUID resourceId;
+
+    @Column("resource_type")
+    private String resourceType; // FILE, USER
+
     @Column("is_read")
     private boolean read;
 

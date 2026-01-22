@@ -11,11 +11,15 @@ import java.util.UUID;
 public interface UserService {
     User getUser(UUID userId);
 
+    User getUserByEmail(String email);
+
     User createUser(UUID userId, String email, String name);
 
     User updateUser(UUID userId, String name, String avatarUrl);
 
     void deleteUser(UUID userId);
+
+    void syncDeleteUser(UUID userId);
 
     UserSettings getUserSettings(UUID userId);
 
@@ -31,4 +35,16 @@ public interface UserService {
     void updateUserQuota(UUID adminId, UUID userId, long newQuota);
 
     void changeUserPlan(UUID adminId, UUID userId, String newPlan);
+
+    java.util.List<User> getUsersByIds(java.util.List<UUID> ids);
+
+    void blockUser(UUID adminId, UUID userId, String reason);
+
+    void syncBlockUser(UUID userId, String reason);
+
+    void unblockUser(UUID adminId, UUID userId);
+
+    void syncUnblockUser(UUID userId);
+
+    void updateLastLogin(UUID userId, java.time.LocalDateTime lastLoginAt);
 }

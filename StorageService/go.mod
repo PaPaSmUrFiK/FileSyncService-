@@ -6,7 +6,7 @@ replace github.com/PaPaSmUrFiK/FileSyncService-/filesync-internal-contracts => .
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
-	github.com/PaPaSmUrFiK/FileSyncService-/filesync-internal-contracts v0.0.0-20260102141232-ca13ea9af7e4 // indirect
+	github.com/PaPaSmUrFiK/FileSyncService-/filesync-internal-contracts v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect

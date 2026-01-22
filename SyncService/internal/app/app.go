@@ -10,15 +10,9 @@ import (
 	"syscall"
 
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/config"
-	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/grpc"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/kafka"
-	kafkalib "github.com/segmentio/kafka-go"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/lib/logger/handlers/slogpretty"
-	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/repository/postgres"
-	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/service"
 	"github.com/PaPaSmUrFiK/FileSyncService-/SyncService/internal/websocket"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
 )
 
 type App struct {
@@ -38,67 +32,26 @@ func (a *App) Run() error {
 	const op = "app.Run"
 	ctx := context.Background()
 
-	// 1. Database
-	db, err := sqlx.Connect("pgx", a.cfg.Postgres.URL)
-	if err != nil {
-		return fmt.Errorf("%s: не удалось подключиться к postgres: %w", op, err)
-	}
-	defer db.Close()
-
-	// 2. Repositories
-	deviceRepo := postgres.NewDeviceRepository(db)
-	syncStateRepo := postgres.NewSyncStateRepository(db)
-	changelogRepo := postgres.NewChangeLogRepository(db)
-	conflictRepo := postgres.NewConflictRepository(db)
-
-	// 3. Kafka
-	producer := kafka.NewProducer(a.cfg.Kafka.Brokers, a.cfg.Kafka.Topics.SyncEvents)
-	defer producer.Close()
-
-	// 3.1. Kafka Consumers
-	fileEventsConsumer := kafka.NewConsumer(a.cfg.Kafka.Brokers, a.cfg.Kafka.Topics.FileEvents, a.cfg.Kafka.ConsumerGroup, a.logger)
-	defer fileEventsConsumer.Close()
-	
-	storageEventsConsumer := kafka.NewConsumer(a.cfg.Kafka.Brokers, a.cfg.Kafka.Topics.StorageEvents, a.cfg.Kafka.ConsumerGroup, a.logger)
-	defer storageEventsConsumer.Close()
-
-	// 4. WebSocket Hub
+	// 1. WebSocket Hub
 	hub := websocket.NewHub(a.logger)
 	go hub.Run(ctx)
 
-	// 5. Services
-	deviceService := service.NewDeviceService(deviceRepo)
-	changelogService := service.NewChangelogService(changelogRepo)
-	conflictService := service.NewConflictService(conflictRepo)
-	syncService := service.NewSyncService(deviceRepo, syncStateRepo, changelogRepo, conflictRepo, producer, a.logger)
+	// 2. Kafka Consumer for Notifications
+	notificationConsumer := kafka.NewNotificationConsumer(
+		a.cfg.Kafka.Brokers,
+		a.cfg.Kafka.Topics.SyncNotifications,
+		a.cfg.Kafka.ConsumerGroup,
+		hub,
+		a.logger,
+	)
 
-	// 5.1. Start Kafka Consumers
-	go func() {
-		fileEventsConsumer.Consume(ctx, func(msg kafkalib.Message) error {
-			return syncService.HandleFileEvent(ctx, msg)
-		})
-	}()
+	// Start consumer in a goroutine
+	go notificationConsumer.Start(ctx)
+	defer notificationConsumer.Close()
 
-	go func() {
-		storageEventsConsumer.Consume(ctx, func(msg kafkalib.Message) error {
-			return syncService.HandleStorageEvent(ctx, msg)
-		})
-	}()
-
-	// 6. gRPC Server
-	grpcHandler := grpc.NewSyncHandler(deviceService, syncService, changelogService, conflictService)
-	grpcServer := grpc.NewServer(a.cfg.GRPC.Port, grpcHandler, a.logger)
-
-	go func() {
-		if err := grpcServer.Start(); err != nil {
-			a.logger.Error("ошибка при запуске gRPC сервера", slog.Any("error", err))
-			os.Exit(1)
-		}
-	}()
-
-	// 8. WebSocket HTTP Server
-	wsHandler := websocket.NewHandler(hub, deviceService, a.logger)
-	http.Handle("/ws/sync", wsHandler)
+	// 3. WebSocket HTTP Server
+	wsHandler := websocket.NewHandler(hub, a.cfg.JWTSecret, a.logger)
+	http.Handle("/ws", wsHandler) // WebSocket endpoint for notifications
 
 	go func() {
 		addr := fmt.Sprintf(":%d", a.cfg.HTTP.Port)
@@ -109,7 +62,7 @@ func (a *App) Run() error {
 		}
 	}()
 
-	a.logger.Info("Sync Service запущен", slog.Int("grpc_port", a.cfg.GRPC.Port), slog.Int("http_port", a.cfg.HTTP.Port))
+	a.logger.Info("Sync Service (Notification Gateway) запущен", slog.Int("http_port", a.cfg.HTTP.Port))
 
 	// Wait for termination signal
 	stop := make(chan os.Signal, 1)
@@ -117,9 +70,6 @@ func (a *App) Run() error {
 	<-stop
 
 	a.logger.Info("остановка Sync Service...")
-	grpcServer.Stop()
-	a.logger.Info("Sync Service остановлен")
-
 	return nil
 }
 

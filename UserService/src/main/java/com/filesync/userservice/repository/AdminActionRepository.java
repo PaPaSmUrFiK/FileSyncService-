@@ -8,4 +8,7 @@ import java.util.UUID;
 
 @Repository
 public interface AdminActionRepository extends JpaRepository<AdminAction, UUID> {
+    void deleteByTargetUserId(UUID targetUserId);
+
+    void deleteByAdminId(UUID adminId);
 }

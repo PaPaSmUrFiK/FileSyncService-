@@ -188,7 +188,6 @@ export function HistoryPage() {
           </div>
           <div>
             <h3 className="text-text-primary text-lg font-medium">{file.name}</h3>
-            <p className="text-sm text-text-muted">{file.path}</p>
           </div>
           <div className="ml-auto">
             <CloudSyncBadge variant="synced">Текущая версия: v{file.version}</CloudSyncBadge>

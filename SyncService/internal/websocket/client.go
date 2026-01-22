@@ -25,11 +25,11 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
-	Hub      *Hub
-	Conn     *websocket.Conn
-	DeviceID uuid.UUID
-	send     chan []byte
-	logger   *slog.Logger
+	Hub    *Hub
+	Conn   *websocket.Conn
+	UserID uuid.UUID
+	send   chan []byte
+	logger *slog.Logger
 }
 
 func (c *Client) ReadPump() {
